@@ -1,0 +1,25 @@
+scan_id: 00000000-0000-0000-0000-000000000000
+seed_tag: cloud_connector
+delete_stale_seeds: true
+aws:
+  enabled: true
+  api_key_secret: asm-cloud-connector/api-key
+  default_region: eu-west-2
+  services:
+    check_ec2: true
+    check_eip: true
+    check_elb: true
+    check_s3: true
+    check_acm: true
+    check_route53: true
+    check_cloudfront: true
+    check_api_gateway: true
+    check_api_gateway_v2: true
+    check_eks: true
+    check_rds: true
+    check_opensearch: true
+    check_lambda: true
+azure:
+  enabled: false
+gcp:
+  enabled: false
