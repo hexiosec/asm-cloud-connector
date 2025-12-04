@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -33,6 +34,25 @@ type AWSServices struct {
 	CheckLambda       bool `yaml:"check_lambda"`
 }
 
+type GCPServices struct {
+	CheckDNSResourceRecordSet    bool `yaml:"check_dns_resource_record_set"`
+	CheckDNSManagedZone          bool `yaml:"check_dns_managed_zone"`
+	CheckComputeInstance         bool `yaml:"check_compute_instance"`
+	CheckComputeAddress          bool `yaml:"check_compute_address"`
+	CheckStorageBucket           bool `yaml:"check_storage_bucket"`
+	CheckCloudFunction           bool `yaml:"check_cloud_function"`
+	CheckRunService              bool `yaml:"check_run_service"`
+	CheckRunDomainMapping        bool `yaml:"check_run_domain_mapping"`
+	CheckAPIGateway              bool `yaml:"check_api_gateway"`
+	CheckSQLInstance             bool `yaml:"check_sql_instance"`
+	CheckComputeForwardingRule   bool `yaml:"check_compute_forwarding_rule"`
+	CheckComputeGlobalForwarding bool `yaml:"check_compute_global_forwarding_rule"`
+	CheckComputeURLMap           bool `yaml:"check_compute_url_map"`
+	CheckAppEngineService        bool `yaml:"check_app_engine_service"`
+	CheckGKECluster              bool `yaml:"check_gke_cluster"`
+	CheckCertificates            bool `yaml:"check_certificates"`
+}
+
 type AWSCloudProvider struct {
 	CloudProvider   `yaml:",inline"`
 	ListAllAccounts bool         `yaml:"list_all_accounts"`
@@ -43,13 +63,19 @@ type AWSCloudProvider struct {
 	DefaultRegion   string       `yaml:"default_region" validate:"required"`
 }
 
+type GCPCloudProvider struct {
+	CloudProvider `yaml:",inline"`
+	Services      *GCPServices `yaml:"services,omitempty" validate:"required_with=Enabled"`
+	Projects      []string     `yaml:"projects" validate:"required_with=Enabled,omitempty,min=1,dive,gcp_project"`
+}
+
 type Config struct {
 	ScanID           string            `yaml:"scan_id" env:"SCAN_ID,overwrite" validate:"required"`
 	SeedTag          string            `yaml:"seed_tag" env:"SEED_TAG,overwrite" validate:"required"`
 	DeleteStaleSeeds bool              `yaml:"delete_stale_seeds" env:"DELETE_STALE_SEEDS,overwrite"`
 	AWS              *AWSCloudProvider `yaml:"aws,omitempty" env:",noinit" validate:"required_without_all=Azure GCP"`
 	Azure            *CloudProvider    `yaml:"azure,omitempty" env:",noinit" validate:"required_without_all=AWS GCP"`
-	GCP              *CloudProvider    `yaml:"gcp,omitempty" env:",noinit" validate:"required_without_all=AWS Azure"`
+	GCP              *GCPCloudProvider `yaml:"gcp,omitempty" env:",noinit" validate:"required_without_all=AWS Azure"`
 
 	Http struct {
 		RetryCount     int           `yaml:"retry_count"  validate:"required"`
@@ -139,5 +165,16 @@ func setDefaults(config *Config) {
 }
 
 func validate(config *Config) error {
-	return validator.New().Struct(config)
+	v := validator.New()
+
+	// Custom validator: gcp_project
+	if err := v.RegisterValidation("gcp_project", func(fl validator.FieldLevel) bool {
+		// We expect a string like "projects/641674919469"
+		value := fl.Field().String()
+		return regexp.MustCompile(`^projects/[0-9]+$`).MatchString(value)
+	}); err != nil {
+		return fmt.Errorf("config: failed to register gcp_project validator: %w", err)
+	}
+
+	return v.Struct(config)
 }

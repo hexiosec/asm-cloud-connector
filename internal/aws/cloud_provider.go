@@ -20,6 +20,10 @@ func NewAWSProvider(cfg *config.Config) (cloud_provider_t.CloudProvider, error) 
 	}, nil
 }
 
+func (c *AWSProvider) GetName() string {
+	return "AWS"
+}
+
 func (c *AWSProvider) Authenticate(ctx context.Context) error {
 	wrapper, err := NewWrapper(ctx, c.cfg.DefaultRegion)
 	if err != nil {
@@ -31,7 +35,7 @@ func (c *AWSProvider) Authenticate(ctx context.Context) error {
 	}
 
 	c.wrapper = wrapper
-	logger.GetGlobalLogger().Debug().Msg("authentication successful")
+	logger.GetLogger(ctx).Debug().Msg("authentication successful")
 	return nil
 }
 
@@ -66,7 +70,8 @@ func (c *AWSProvider) GetResources(ctx context.Context) ([]string, error) {
 
 		assumeWrapper, err := c.wrapper.AssumeRole(ctx, role)
 		if err != nil {
-			return nil, fmt.Errorf("unable to load config with role %s %w", role, err)
+			logger.GetLogger(ctx).Warn().Err(err).Msgf("unable to load config with role %s, skipping account %s", role, account)
+			continue
 		}
 
 		resources, err = getResources(ctx, assumeWrapper, c.cfg.Services, resources)

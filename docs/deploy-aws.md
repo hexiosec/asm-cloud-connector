@@ -23,7 +23,7 @@ You can deploy it in two ways:
 - **Lambda:** Easiest to set up; best for smaller environments and shorter runs.
 - **Fargate:** Allows longer execution times, supports container workflows, and avoids Lambda’s 15‑minute timeout.
 
-The connector loads configuration from a YAML file or environment variables and retrieves your API key securely from AWS Secrets Manager.
+The Cloud Connector loads configuration from a YAML file or environment variables and retrieves your API key securely from AWS Secrets Manager.
 
 ---
 
@@ -32,7 +32,7 @@ The connector loads configuration from a YAML file or environment variables and 
 Before deploying, ensure you have:
 
 - An active **Hexiosec ASM** account and a valid API key
-- AWS permissions for IAM, Lambda, ECS, EventBridge, Secrets Manager and/or SSM
+- AWS permissions for IAM, Lambda, ECS, EventBridge, Secrets Manager
 - A Go toolchain installed if you plan to build the Lambda bundle from source (not required when using prebuilt releases)
 - A VPC with subnets for Fargate deployments (if using ECS)
 - AWS CLI installed (optional but recommended, as this guide uses CLI examples)
@@ -41,7 +41,7 @@ Before deploying, ensure you have:
 
 ## 3. Configuration
 
-The connector reads its configuration from a `config.yml` file or from environment variables and/or AWS Systems Manager Parameter Store (SSM).
+The Cloud Connector reads its configuration from a `config.yml` file or from environment variables and/or AWS Systems Manager Parameter Store (SSM).
 
 ### Example `config.yml`
 
@@ -96,20 +96,21 @@ Environment variables override YAML values.
 
 ### Key Configuration Options
 
-| Key                     | Description                                                                                                                              |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `scan_id`               | ASM scan to receive discovered resources.                                                                                                |
-| `seed_tag`              | Label applied to all seeds created by this connector.                                                                                    |
-| `delete_stale_seeds`    | Whether to remove resources no longer present in AWS.                                                                                    |
-| `aws.api_key_secret`    | Path to the ASM API key secret in AWS Secrets Manager.                                                                                   |
-| `aws.default_region`    | Default AWS region to query.                                                                                                             |
-| `aws.services.*`        | Toggles for individual AWS service checks.                                                                                               |
-| `aws.assume_role`       | Role name to assume when scanning multiple accounts. The connector constructs the ARN as `arn:aws:iam::<ACCOUNT_ID>:role/<assume_role>`. |
-| `aws.list_all_accounts` | When `true`, automatically enumerates all linked accounts under your organisation.                                                       |
-| `http.retry_*`          | Controls retry behaviour for API requests to Hexiosec ASM.                                                                               |
+| Key                     | Description                                                                                                                                    |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scan_id`               | ASM scan to receive discovered resources.                                                                                                      |
+| `seed_tag`              | Label applied to all seeds created by this connector.                                                                                          |
+| `delete_stale_seeds`    | Whether to remove resources no longer present in AWS.                                                                                          |
+| `aws.api_key_secret`    | Path to the ASM API key secret in AWS Secrets Manager.                                                                                         |
+| `aws.default_region`    | Default AWS region to query.                                                                                                                   |
+| `aws.services.*`        | Toggles for individual AWS service checks.                                                                                                     |
+| `aws.assume_role`       | Role name to assume when scanning multiple accounts. The Cloud Connector constructs the ARN as `arn:aws:iam::<ACCOUNT_ID>:role/<assume_role>`. |
+| `aws.list_all_accounts` | When `true`, automatically enumerates all linked accounts under your organisation.                                                             |
+| `aws.accounts`          | Explicit list of AWS account IDs to enumerate for resources.                                                                                   |
+| `http.retry_*`          | Controls retry behaviour for API requests to Hexiosec ASM.                                                                                     |
 
 > **Automatic account detection:**  
-> If `list_all_accounts` is `true`, the connector detects all organisation accounts automatically. Otherwise, specify account IDs under `accounts` and provide an `assume_role` name.
+> If `list_all_accounts` is `true`, the Cloud Connector detects all organisation accounts automatically. Otherwise, specify account IDs under `accounts` and provide an `assume_role` name.
 
 > **Validation rules:**
 >
@@ -319,7 +320,7 @@ aws iam put-role-policy \
 
 If the Cloud Connector needs to discover resources in multiple AWS accounts, each target account must contain a read-only IAM role that the Lambda execution role can assume.
 
-The connector automatically constructs the ARN using the account ID and your configured `assume_role` value.
+The Cloud Connector automatically constructs the ARN using the account ID and your configured `assume_role` value.
 
 For example:
 
@@ -327,7 +328,7 @@ For example:
 assume_role: CloudConnectorReadOnly
 ```
 
-With account ID `123456789012`, the connector will assume:
+With account ID `123456789012`, the Cloud Connector will assume:
 
 ```
 arn:aws:iam::123456789012:role/CloudConnectorReadOnly
@@ -424,7 +425,7 @@ aws lambda create-function \
 
 ### 6.4 Schedule the Lambda
 
-Use EventBridge to run the connector periodically:
+Use EventBridge to run the Cloud Connector periodically:
 
 ```bash
 aws events put-rule \
@@ -455,7 +456,7 @@ Fargate bypasses Lambda’s 15‑minute timeout and is suitable for organisation
 
 This option uses the **public Docker Hub image**, so customers do **not** need to build or push images to ECR.
 
-### 7.1 Store the connector configuration in SSM
+### 7.1 Store the Cloud Connector configuration in SSM
 
 ```bash
 aws ssm put-parameter \
@@ -467,10 +468,10 @@ aws ssm put-parameter \
 ### 7.2 Create the ECS task execution role
 
 Fargate tasks require an IAM role that the ECS agent can assume.  
-This role must allow the connector to:
+This role must allow the Cloud Connector to:
 
 - discover AWS resources (Describe/List actions)
-- read the connector configuration from SSM
+- read the Cloud Connector configuration from SSM
 - retrieve the ASM API key from Secrets Manager
 - write logs to CloudWatch
 - optionally assume cross-account read-only roles (if scanning multiple accounts)
@@ -586,7 +587,7 @@ aws iam put-role-policy \
 
 #### 7.2.3 Cross-Account Setup (Optional)
 
-If you want the connector to discover resources across multiple AWS accounts, each target account must contain a read-only role the ECS task can assume — the same model as the Lambda deployment.
+If you want the Cloud Connector to discover resources across multiple AWS accounts, each target account must contain a read-only role the ECS task can assume — the same model as the Lambda deployment.
 
 Use the same trust/permission structure from **6.2.3**, replacing the principal role ARN with:
 
@@ -745,7 +746,8 @@ A common pattern is:
 3. In the bootstrap function:
    - Assume an appropriate role in the new member account.
    - Create or update the `CloudConnectorReadOnly` IAM role.
-   - Attach the read-only discovery policy required by the connector.
+   - Attach the read-only discovery policy required by the Cloud
+     Connector.
 4. (Optional) Periodically run an audit job that:
    - Lists all organisation accounts.
    - Checks for the presence of the `CloudConnectorReadOnly` role.
@@ -760,24 +762,27 @@ This approach ensures that:
 
 To minimise risk and follow the principle of least privilege:
 
-- **Use a dedicated AWS account for the connector where possible.**  
+- **Use a dedicated AWS account for the Cloud Connector where possible.**  
   Running the Lambda function or Fargate tasks from a dedicated “security tooling” account limits the blast radius if credentials are compromised.
 
 - **Restrict IAM permissions to what you actually use.**  
   If you are not scanning certain services (for example, EKS or OpenSearch), you can safely remove those permissions from the IAM policies.
 
 - **Keep secrets isolated and tightly scoped.**  
-  Limit access to the `asm-cloud-connector/api-key` secret and any related SSM parameters to the connector’s execution role only.
+   Limit access to the `asm-cloud-connector/api-key` secret and any related SSM parameters to the Cloud
+  Connector’s execution role only.
 
 - **Ensure outbound HTTPS access to Hexiosec ASM.**  
-  Whether using Lambda or Fargate, the connector must be able to reach the Hexiosec ASM API endpoint over HTTPS.  
-  If you use a private VPC, ensure that NAT gateways, VPC endpoints, or proxies are correctly configured.
+   Whether using Lambda or Fargate, the Cloud
+  Connector must be able to reach the Hexiosec ASM API endpoint over HTTPS.  
+   If you use a private VPC, ensure that NAT gateways, VPC endpoints, or proxies are correctly configured.
 
 - **Maintain consistent role naming across accounts.**  
   Use the same `assume_role` name (for example, `CloudConnectorReadOnly`) everywhere. This keeps configuration simple and avoids per-account overrides.
 
 - **Review logs and permissions regularly.**  
-  Periodically review CloudWatch logs, IAM policies, and role usage to confirm the connector is behaving as expected and only accessing what it needs.
+   Periodically review CloudWatch logs, IAM policies, and role usage to confirm the Cloud
+  Connector is behaving as expected and only accessing what it needs.
 
 ## 9. Validating Your Deployment
 
@@ -788,11 +793,11 @@ After the first run:
 - Ensure ECS task exits with code 0 (Fargate)
 - Ensure Lambda completes within expected time (Lambda)
 
-When the connector adds or removes resources, the associated Hexiosec ASM scan will automatically re-run to analyse the updated set of seeds. You do not need to manually trigger a scan after each connector run; instead, use the ASM UI and logs to confirm that new or removed resources are reflected in the scan results.
+When the Cloud Connector adds or removes resources, the associated Hexiosec ASM scan will automatically re-run to analyse the updated set of seeds. You do not need to manually trigger a scan after each connector run; instead, use the ASM UI and logs to confirm that new or removed resources are reflected in the scan results.
 
 ---
 
-## 10. Updating the Connector
+## 10. Updating the Cloud Connector
 
 ### Lambda
 
@@ -824,13 +829,13 @@ We recommend:
 
 | Issue                              | Cause                                      | Fix                                                                                                    |
 | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Authentication errors              | Invalid or missing API key / secret path   | Confirm the secret exists in Secrets Manager, matches `aws.api_key_secret`, and is readable.           |
+| Authentication errors              | Invalid or missing API key/secret path     | Confirm the secret exists in Secrets Manager, matches `aws.api_key_secret`, and is readable.           |
 | No resources found                 | Insufficient IAM permissions               | Review IAM role policies and ensure required `Describe`/`List` actions are present.                    |
 | Timeout                            | Lambda execution too long                  | Increase Lambda timeout or switch to Fargate for larger environments.                                  |
 | Cannot reach Hexiosec ASM endpoint | Restricted network egress from VPC/subnets | Allow outbound HTTPS to the Hexiosec ASM API (for example, via a NAT gateway, VPC endpoint, or proxy). |
-| “AccessDenied” for SSM             | Missing `ssm:GetParameter` permission      | Add SSM read permissions for the connector’s SSM parameter ARN.                                        |
+| “AccessDenied” for SSM             | Missing `ssm:GetParameter` permission      | Add SSM read permissions for the Cloud Connector’s SSM parameter ARN.                                  |
 | “AccessDenied” for secrets         | Missing `secretsmanager:GetSecretValue`    | Add Secrets Manager read permissions for the `asm-cloud-connector/api-key` secret ARN.                 |
-| Missing seeds in ASM               | Wrong or misconfigured `scan_id`           | Confirm `scan_id` in config matches the target ASM scan and re-run the connector.                      |
+| Missing seeds in ASM               | Wrong or misconfigured `scan_id`           | Confirm `scan_id` in config matches the target ASM scan and re-run the Cloud Connector.                |
 
 ---
 

@@ -84,8 +84,8 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		logger.GetLogger(ctx).Warn().Err(err).Msg("Could not init cloud provider")
 		return fmt.Errorf("core: could not init cloud provider, %w", err)
-
 	}
+	ctx = logger.WithLogger(ctx, logger.GetLogger(ctx).With().Str("cloud_provider", cp.GetName()).Logger())
 
 	if err := cp.Authenticate(ctx); err != nil {
 		logger.GetLogger(ctx).Warn().Err(err).Msg("Could not authenticate with cloud provider")

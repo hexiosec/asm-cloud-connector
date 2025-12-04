@@ -3,3 +3,4 @@ bootstrap
 asm-cloud-connector-lambda.zip
 .modcache/*
 .DS_Store
+config.local.yml

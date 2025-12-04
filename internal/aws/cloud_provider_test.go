@@ -95,6 +95,29 @@ func TestAWSProvider_GetResources_AssumeRolePerAccount(t *testing.T) {
 	assert.Equal(t, []string{"acct-res"}, resources)
 }
 
+func TestAWSProvider_GetResources_AssumeRoleErr_Continue(t *testing.T) {
+	role := "MyRole"
+	account := "123456789012"
+	cfg := &config.AWSCloudProvider{
+		Accounts:   []string{account},
+		AssumeRole: &role,
+		Services:   &config.AWSServices{CheckEC2: true},
+	}
+
+	parent := NewMockWrapper(t).(*MockWrapper)
+	provider := &AWSProvider{
+		cfg:     cfg,
+		wrapper: parent,
+	}
+
+	parent.On("AssumeRole", "arn:aws:iam::123456789012:role/MyRole").
+		Return(nil, assert.AnError)
+
+	resources, err := provider.GetResources(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, []string{}, resources)
+}
+
 func Test_getResources_GetRegionsError(t *testing.T) {
 	mockWrapper := NewMockWrapper(t).(*MockWrapper)
 	services := &config.AWSServices{CheckEC2: true}

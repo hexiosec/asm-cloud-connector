@@ -23,3 +23,22 @@ azure:
   enabled: false
 gcp:
   enabled: false
+  projects:
+    - projects/123456
+  services:
+    check_dns_resource_record_set: true
+    check_dns_managed_zone: true
+    check_compute_instance: true
+    check_compute_address: true
+    check_storage_bucket: true
+    check_cloud_function: true
+    check_run_service: true
+    check_run_domain_mapping: true
+    check_api_gateway: true
+    check_sql_instance: true
+    check_compute_forwarding_rule: true
+    check_compute_global_forwarding_rule: true
+    check_compute_url_map: true
+    check_app_engine_service: true
+    check_gke_cluster: true
+    check_certificates: true

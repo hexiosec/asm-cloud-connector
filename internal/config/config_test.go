@@ -296,3 +296,125 @@ func Test_LoadFromFile_FallbackWhenEnvUnset(t *testing.T) {
 	assert.Equal(t, "cloud_connector", config.SeedTag)
 	assert.True(t, config.AWS.Enabled)
 }
+
+func Test_GCPProjectsValidation(t *testing.T) {
+	tests := []struct {
+		name        string
+		testFile    string
+		shouldErr   bool
+		errText     string
+		enabled     bool
+		numProjects int
+	}{
+		{
+			name: "enabled_NoProjects_Fail",
+			testFile: `
+				scan_id: 00000000-0000-0000-0000-000000000000
+				seed_tag: cloud_connector
+				gcp:
+					enabled: true
+					services:
+						check_dns_resource_record_set: true
+				http:
+					retry_count: 4
+					retry_base_delay: 1s
+					retry_max_delay: 5m
+			`,
+			shouldErr: true,
+			errText:   "'Projects' failed on the 'required_with' tag",
+		},
+		{
+			name: "enabled_EmptyProjects_Fail",
+			testFile: `
+				scan_id: 00000000-0000-0000-0000-000000000000
+				seed_tag: cloud_connector
+				gcp:
+					enabled: true
+					projects: []
+					services:
+						check_dns_resource_record_set: true
+				http:
+					retry_count: 4
+					retry_base_delay: 1s
+					retry_max_delay: 5m
+			`,
+			shouldErr: true,
+			errText:   "'Projects' failed on the 'min' tag",
+		},
+		{
+			name: "enabled_ProjectsProvided_Success",
+			testFile: `
+				scan_id: 00000000-0000-0000-0000-000000000000
+				seed_tag: cloud_connector
+				gcp:
+					enabled: true
+					projects: [projects/123456789]
+					services:
+						check_dns_resource_record_set: true
+				http:
+					retry_count: 4
+					retry_base_delay: 1s
+					retry_max_delay: 5m
+			`,
+			shouldErr:   false,
+			enabled:     true,
+			numProjects: 1,
+		},
+		{
+			name: "enabled_BadFormatProject_Fail",
+			testFile: `
+				scan_id: 00000000-0000-0000-0000-000000000000
+				seed_tag: cloud_connector
+				gcp:
+					enabled: true
+					projects: [projects/PROJECT_ID]
+					services:
+						check_dns_resource_record_set: true
+				http:
+					retry_count: 4
+					retry_base_delay: 1s
+					retry_max_delay: 5m
+			`,
+			shouldErr: true,
+			errText:   "failed on the 'gcp_project' tag",
+		},
+		{
+			name: "disabled_NoProjects_Success",
+			testFile: `
+				scan_id: 00000000-0000-0000-0000-000000000000
+				seed_tag: cloud_connector
+				gcp:
+					enabled: false
+					services:
+						check_dns_resource_record_set: true
+				azure:
+					enabled: true
+				http:
+					retry_count: 4
+					retry_base_delay: 1s
+					retry_max_delay: 5m
+			`,
+			shouldErr:   false,
+			enabled:     false,
+			numProjects: 0,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			config, err := unmarshalConfig([]byte(strings.ReplaceAll(tc.testFile, "\t", "  ")))
+			require.NoError(t, err)
+
+			err = validate(config)
+			if tc.shouldErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errText)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.enabled, config.GCP.Enabled)
+			assert.Len(t, config.GCP.Projects, tc.numProjects)
+		})
+	}
+}

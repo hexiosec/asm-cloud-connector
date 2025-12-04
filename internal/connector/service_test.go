@@ -362,6 +362,7 @@ func TestNormalise(t *testing.T) {
 		"not a domain",
 		"https://[2001:db8::2]:443/foo",
 		"ftp://user@host.example.org",
+		"*.cloudrun.regr.creepycrawly.io.",
 	}
 
 	got := normalise(context.Background(), input)
@@ -374,6 +375,7 @@ func TestNormalise(t *testing.T) {
 		"2001:db8::1",
 		"2001:db8::2",
 		"host.example.org",
+		"cloudrun.regr.creepycrawly.io",
 	}
 
 	assert.Equal(t, expected, got)

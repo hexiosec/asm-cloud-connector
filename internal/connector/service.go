@@ -136,7 +136,7 @@ func (c *Connector) SyncResources(ctx context.Context, resources []string) error
 
 	logger.GetLogger(ctx).Trace().Msg("Deleting stale seeds")
 	// Deletion is best-effort: log but don't abort
-	// Stale seeds are existingSeeds that aren't in the resource list and have a matching seed tag, implying it was previously added by the connector
+	// Stale seeds are existingSeeds that aren't in the resource list and have a matching seed tag, implying it was previously added by the Cloud Connector
 	for _, seed := range existingSeeds {
 		if !slices.Contains(seed.Tags, c.seedTag) {
 			logger.GetLogger(ctx).Debug().Msgf("skipping existing seed %s as it doesn't have tag %s, so was probably added manually", seed.Name, c.seedTag)
@@ -219,6 +219,9 @@ func normaliseResource(raw string) (string, bool) {
 	if raw == "" {
 		return "", false
 	}
+
+	// Strip leading wildcard prefix (e.g. *.example.com) before further parsing
+	raw = strings.TrimPrefix(raw, "*.")
 
 	// handle bare IPv6
 	if strings.Contains(raw, ":") && !strings.Contains(raw, "[") {
