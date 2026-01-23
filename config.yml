@@ -21,6 +21,21 @@ aws:
     check_lambda: true
 azure:
   enabled: false
+  services:
+    check_public_ip_addresses: true
+    check_application_gateways: true
+    check_application_gateway_certificates: true
+    check_front_door_classic: true
+    check_front_door_afd: true
+    check_traffic_manager: true
+    check_dns_zones: true
+    check_dns_records: true
+    check_storage_static_websites: true
+    check_cdn_endpoints: true
+    check_app_services: true
+    check_sql_servers: true
+    check_cosmos_db: true
+    check_redis_cache: true
 gcp:
   enabled: false
   projects:

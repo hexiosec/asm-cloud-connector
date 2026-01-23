@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/hexiosec/asm-cloud-connector/internal/aws"
+	"github.com/hexiosec/asm-cloud-connector/internal/azure"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
 	"github.com/hexiosec/asm-cloud-connector/internal/gcp"
 	"github.com/stretchr/testify/assert"
@@ -22,16 +23,17 @@ func TestNewCloudProvider_AWSEnabled_Success(t *testing.T) {
 	assert.IsType(t, &aws.AWSProvider{}, provider)
 }
 
-func TestNewCloudProvider_AzureEnabled_ErrNotAvailable(t *testing.T) {
+func TestNewCloudProvider_AzureEnabled_Success(t *testing.T) {
 	cfg := &config.Config{
-		Azure: &config.CloudProvider{Enabled: true},
+		Azure: &config.AzureCloudProvider{
+			CloudProvider: config.CloudProvider{Enabled: true},
+		},
 	}
 
 	provider, err := NewCloudProvider(cfg)
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not available")
-	assert.Nil(t, provider)
+	assert.NoError(t, err)
+	assert.IsType(t, &azure.AzureProvider{}, provider)
 }
 
 func TestNewCloudProvider_GCPEnabled_Success(t *testing.T) {

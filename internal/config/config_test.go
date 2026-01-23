@@ -387,8 +387,6 @@ func Test_GCPProjectsValidation(t *testing.T) {
 					enabled: false
 					services:
 						check_dns_resource_record_set: true
-				azure:
-					enabled: true
 				http:
 					retry_count: 4
 					retry_base_delay: 1s

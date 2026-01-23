@@ -22,8 +22,8 @@ type IGCPWrapper interface {
 	GetCertificates(ctx context.Context, project string) ([]*certificatemanagerpb.Certificate, error)
 	IsBucketPublic(ctx context.Context, bucketName string) bool
 }
-type GCPWrapper struct {
-}
+
+type GCPWrapper struct{}
 
 func NewWrapper() (IGCPWrapper, error) {
 	return &GCPWrapper{}, nil

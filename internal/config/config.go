@@ -53,6 +53,23 @@ type GCPServices struct {
 	CheckCertificates            bool `yaml:"check_certificates"`
 }
 
+type AzureServices struct {
+	CheckPublicIPAddresses              bool `yaml:"check_public_ip_addresses"`
+	CheckApplicationGateways            bool `yaml:"check_application_gateways"`
+	CheckApplicationGatewayCertificates bool `yaml:"check_application_gateway_certificates"`
+	CheckFrontDoorClassic               bool `yaml:"check_front_door_classic"`
+	CheckFrontDoorAfd                   bool `yaml:"check_front_door_afd"`
+	CheckTrafficManager                 bool `yaml:"check_traffic_manager"`
+	CheckDNSZones                       bool `yaml:"check_dns_zones"`
+	CheckDNSRecords                     bool `yaml:"check_dns_records"`
+	CheckStorageStaticWebsites          bool `yaml:"check_storage_static_websites"`
+	CheckCDNEndpoints                   bool `yaml:"check_cdn_endpoints"`
+	CheckAppServices                    bool `yaml:"check_app_services"`
+	CheckSQLServers                     bool `yaml:"check_sql_servers"`
+	CheckCosmosDB                       bool `yaml:"check_cosmos_db"`
+	CheckRedisCache                     bool `yaml:"check_redis_cache"`
+}
+
 type AWSCloudProvider struct {
 	CloudProvider   `yaml:",inline"`
 	ListAllAccounts bool         `yaml:"list_all_accounts"`
@@ -69,13 +86,18 @@ type GCPCloudProvider struct {
 	Projects      []string     `yaml:"projects" validate:"required_with=Enabled,omitempty,min=1,dive,gcp_project"`
 }
 
+type AzureCloudProvider struct {
+	CloudProvider `yaml:",inline"`
+	Services      *AzureServices `yaml:"services,omitempty" validate:"required_with=Enabled"`
+}
+
 type Config struct {
-	ScanID           string            `yaml:"scan_id" env:"SCAN_ID,overwrite" validate:"required"`
-	SeedTag          string            `yaml:"seed_tag" env:"SEED_TAG,overwrite" validate:"required"`
-	DeleteStaleSeeds bool              `yaml:"delete_stale_seeds" env:"DELETE_STALE_SEEDS,overwrite"`
-	AWS              *AWSCloudProvider `yaml:"aws,omitempty" env:",noinit" validate:"required_without_all=Azure GCP"`
-	Azure            *CloudProvider    `yaml:"azure,omitempty" env:",noinit" validate:"required_without_all=AWS GCP"`
-	GCP              *GCPCloudProvider `yaml:"gcp,omitempty" env:",noinit" validate:"required_without_all=AWS Azure"`
+	ScanID           string              `yaml:"scan_id" env:"SCAN_ID,overwrite" validate:"required"`
+	SeedTag          string              `yaml:"seed_tag" env:"SEED_TAG,overwrite" validate:"required"`
+	DeleteStaleSeeds bool                `yaml:"delete_stale_seeds" env:"DELETE_STALE_SEEDS,overwrite"`
+	AWS              *AWSCloudProvider   `yaml:"aws,omitempty" env:",noinit" validate:"required_without_all=Azure GCP"`
+	Azure            *AzureCloudProvider `yaml:"azure,omitempty" env:",noinit" validate:"required_without_all=AWS GCP"`
+	GCP              *GCPCloudProvider   `yaml:"gcp,omitempty" env:",noinit" validate:"required_without_all=AWS Azure"`
 
 	Http struct {
 		RetryCount     int           `yaml:"retry_count"  validate:"required"`
