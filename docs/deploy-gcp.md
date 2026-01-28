@@ -10,7 +10,7 @@ Cloud Run jobs are a good fit for the Cloud Connector because they:
 - Support long‑running tasks (up to 24 hours).
 - Integrate directly with **Secret Manager** for configuration and API keys.
 
-The same core `config.yml` file used for AWS and Azure can be reused for GCP. The Cloud Connector then discovers internet‑exposed resources in your GCP projects and syncs them into Hexiosec ASM.
+The Cloud Connector discovers internet‑exposed resources in your GCP projects and syncs them into Hexiosec ASM.
 
 ---
 
@@ -276,9 +276,11 @@ You should see log messages for:
 In the Hexiosec ASM portal:
 
 1. Navigate to the relevant **scan**.
-2. Scroll down to the **Scan Seeds** widget.
-3. Confirm that new seeds tagged with `cloud_connector` are present.
+2. Scroll down to the **Scan Seeds** widget on the Scan Overview page.
+3. Confirm that new seeds tagged with `cloud_connector` (or your configured value) are present.
 4. Check that subsequent scan runs include the GCP resources discovered by the Cloud Connector.
+
+When the Cloud Connector adds or removes resources, the associated Hexiosec ASM scan will automatically re-run to analyse the updated set of seeds. You do not need to manually trigger a scan after each connector run; instead, use the ASM UI and logs to confirm that new or removed resources are reflected in the scan results.
 
 ---
 

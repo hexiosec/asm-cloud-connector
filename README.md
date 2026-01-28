@@ -26,7 +26,7 @@ By deploying this Cloud Connector in your own cloud environment, you accept full
 Documentation for individual providers will be added here:
 
 - **AWS** — [Deployment Guide](./docs/deploy-aws.md)
-- **Azure** — _coming soon_
+- **Azure** — [Deployment Guide](./docs/deploy-azure.md)
 - **Google Cloud Platform (GCP)** — [Deployment Guide](./docs/deploy-gcp.md)
 
 ## Generating an API Key
@@ -55,7 +55,7 @@ It authenticates with your cloud provider, collects internet-exposed resources, 
 For production deployments, see the cloud provider deployment guides:
 
 - **AWS** — [Deployment Guide](./docs/deploy-aws.md)
-- **Azure** — _coming soon_
+- **Azure** — [Deployment Guide](./docs/deploy-azure.md)
 - **Google Cloud Platform (GCP)** — [Deployment Guide](./docs/deploy-gcp.md)
 
 ### Configuration
@@ -133,6 +133,32 @@ AWS service toggles:
 | `CheckRDS`          | `aws.services.check_rds`            | RDS instance and cluster endpoints.                    |
 | `CheckOpenSearch`   | `aws.services.check_opensearch`     | OpenSearch domain endpoints.                           |
 | `CheckLambda`       | `aws.services.check_lambda`         | Lambda Function URLs.                                  |
+
+#### Azure Configuration
+
+| Field      | YAML/env key       | Purpose                                        | Notes/defaults                                                         |
+| ---------- | ------------------ | ---------------------------------------------- | ---------------------------------------------------------------------- |
+| `Enabled`  | `azure.enabled`    | Toggles Azure discovery.                       | At least one cloud provider must be enabled overall.                   |
+| `Services` | `azure.services.*` | Enables discovery for specific Azure services. | Each flag defaults to `false`. See table below for individual toggles. |
+
+Azure service toggles:
+
+| Flag                                  | YAML key                                                | Resources Collected (when enabled)                |
+| ------------------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
+| `CheckPublicIPAddresses`              | `azure.services.check_public_ip_addresses`              | Public IP addresses and DNS names.                |
+| `CheckApplicationGateways`            | `azure.services.check_application_gateways`             | Application Gateway hostnames.                    |
+| `CheckApplicationGatewayCertificates` | `azure.services.check_application_gateway_certificates` | Application Gateway certificate domains and SANs. |
+| `CheckFrontDoorClassic`               | `azure.services.check_front_door_classic`               | Azure Front Door (Classic) hostnames.             |
+| `CheckFrontDoorAfd`                   | `azure.services.check_front_door_afd`                   | Azure Front Door (AFD) hostnames.                 |
+| `CheckTrafficManager`                 | `azure.services.check_traffic_manager`                  | Traffic Manager FQDNs.                            |
+| `CheckDNSZones`                       | `azure.services.check_dns_zones`                        | DNS zone names.                                   |
+| `CheckDNSRecords`                     | `azure.services.check_dns_records`                      | DNS record FQDNs.                                 |
+| `CheckStorageStaticWebsites`          | `azure.services.check_storage_static_websites`          | Storage account static website endpoints.         |
+| `CheckCDNEndpoints`                   | `azure.services.check_cdn_endpoints`                    | CDN endpoint hostnames.                           |
+| `CheckAppServices`                    | `azure.services.check_app_services`                     | App Service hostnames.                            |
+| `CheckSQLServers`                     | `azure.services.check_sql_servers`                      | Azure SQL server FQDNs.                           |
+| `CheckCosmosDB`                       | `azure.services.check_cosmos_db`                        | Cosmos DB document endpoints.                     |
+| `CheckRedisCache`                     | `azure.services.check_redis_cache`                      | Azure Cache for Redis hostnames.                  |
 
 #### GCP Configuration
 
@@ -316,7 +342,6 @@ go run -ldflags "-X github.com/hexiosec/asm-cloud-connector/internal/version.ver
 The Hexiosec ASM Cloud Connector follows a structured versioning and support approach to ensure stability and security.
 
 - **Supported Versions**
-
   - The current release and the previous minor release are actively supported.
   - Both receive security and critical bug fixes where applicable.
   - This rule applies across major versions — for example:
@@ -324,7 +349,6 @@ The Hexiosec ASM Cloud Connector follows a structured versioning and support app
     - When `2.1.0` is released, support continues for `2.1.0` and `2.0.0`.
 
 - **Patch Releases**
-
   - Patch versions are reserved for bug fixes and security updates.
   - They do **not** introduce breaking changes or alter expected behaviour.
 

@@ -789,9 +789,17 @@ To minimise risk and follow the principle of least privilege:
 After the first run:
 
 - Check CloudWatch logs for sync messages
-- Confirm discovered seeds appear in Hexiosec ASM
 - Ensure ECS task exits with code 0 (Fargate)
 - Ensure Lambda completes within expected time (Lambda)
+
+### 9.1 Verify in Hexiosec ASM
+
+In the Hexiosec ASM portal:
+
+1. Navigate to the relevant **scan**.
+2. Scroll down to the **Scan Seeds** widget on the Scan Overview page.
+3. Confirm that new seeds tagged with `cloud_connector` (or your configured value) are present.
+4. Check that subsequent scan runs include the AWS resources discovered by the Cloud Connector.
 
 When the Cloud Connector adds or removes resources, the associated Hexiosec ASM scan will automatically re-run to analyse the updated set of seeds. You do not need to manually trigger a scan after each connector run; instead, use the ASM UI and logs to confirm that new or removed resources are reflected in the scan results.
 
