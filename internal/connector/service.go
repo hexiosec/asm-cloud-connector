@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/idna"
 
 	"github.com/hexiosec/asm-cloud-connector/internal/api"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
 	"github.com/hexiosec/asm-cloud-connector/internal/logger"
 	asm "github.com/hexiosec/asm-sdk-go"
@@ -63,15 +64,15 @@ func (c *Connector) Authenticate(ctx context.Context) error {
 // SyncResources synchronises local resources with ASM seeds.
 // Returns an error only for fatal conditions (e.g. API unavailable).
 // Known validation failures or best-effort deletions are logged and skipped.
-func (c *Connector) SyncResources(ctx context.Context, resources []string) error {
+func (c *Connector) SyncResources(ctx context.Context, assets []*cloud_provider_t.Asset) error {
 	// Remove duplicates
-	resources = dedup(ctx, resources)
+	assets = dedup(ctx, assets)
 
 	// Normalise i.e. extract domains from websites
-	resources = normalise(ctx, resources)
+	assets = normalise(ctx, assets)
 
 	// Remove duplicates again - just in case
-	resources = dedup(ctx, resources)
+	assets = dedup(ctx, assets)
 
 	// Get existing seeds
 	existingSeeds, err := c.getSeeds(ctx)
@@ -80,32 +81,32 @@ func (c *Connector) SyncResources(ctx context.Context, resources []string) error
 	}
 
 	// Add seeds to scan, if they don't exist
-	for _, resource := range resources {
-		iCtx := logger.WithLogger(ctx, logger.GetLogger(ctx).With().Str("resource", resource).Logger())
+	for _, asset := range assets {
+		iCtx := logger.WithLogger(ctx, logger.GetLogger(ctx).With().Str("resource", asset.Name).Logger())
 		logger.GetLogger(iCtx).Trace().Msg("Processing resource")
 
-		if _, ok := existingSeeds[resource]; ok {
-			delete(existingSeeds, resource)
-			logger.GetLogger(iCtx).Debug().Msgf("Seed %s already exists", resource)
+		if _, ok := existingSeeds[asset.Name]; ok {
+			delete(existingSeeds, asset.Name)
+			logger.GetLogger(iCtx).Debug().Msgf("Seed %s already exists", asset.Name)
 			continue
 		}
 
-		resourceType := getResourceType(resource)
+		resourceType := getResourceType(asset.Name)
 		if resourceType == resourceIPv6 {
 			logger.GetLogger(iCtx).Warn().Msg("Cannot add IPv6 as seed, skipping")
 			continue
 		}
 
-		logger.GetLogger(iCtx).Debug().Msgf("Adding seed %s", resource)
+		logger.GetLogger(iCtx).Debug().Msgf("Adding seed %s", asset.Name)
 		// Semgrep false positive: resp is nil-checked before use
 		// nosemgrep: trailofbits.go.invalid-usage-of-modified-variable.invalid-usage-of-modified-variable
 		_, resp, err := c.sdk.AddScanSeedById(
 			ctx,
 			c.scanID,
 			asm.CreateScanSeedRequest{
-				Name: resource,
+				Name: asset.Name,
 				Type: resourceType,
-				Tags: []string{c.seedTag},
+				Tags: assetTags(asset, c.seedTag),
 			},
 		)
 		if err != nil {
@@ -115,16 +116,16 @@ func (c *Connector) SyncResources(ctx context.Context, resources []string) error
 				if rErr != nil {
 					logger.GetLogger(iCtx).Error().Err(rErr).Msg("failed to get error code from response to determine why the seed couldn't be added")
 					// This may indicate a deeper API issue -> abort
-					return fmt.Errorf("failed to add seed %s %w", resource, err)
+					return fmt.Errorf("failed to add seed %s %w", asset.Name, err)
 				}
 
 				// Known non-fatal case: seed invalid skip and continue.
-				logger.GetLogger(iCtx).Warn().Err(err).Str("code", code).Msgf("failed to add seed %s because %s", resource, code)
+				logger.GetLogger(iCtx).Warn().Err(err).Str("code", code).Msgf("failed to add seed %s because %s", asset.Name, code)
 				continue
 			}
 
 			// Unexpected failure -> abort
-			return fmt.Errorf("failed to add seed %s %w", resource, err)
+			return fmt.Errorf("failed to add seed %s %w", asset.Name, err)
 		}
 	}
 
@@ -168,50 +169,102 @@ func (c *Connector) getSeeds(ctx context.Context) (map[string]*asm.SeedsResponse
 	return byName, nil
 }
 
-func dedup(ctx context.Context, resources []string) []string {
-	if len(resources) < 2 {
-		return resources
+func dedup(ctx context.Context, assets []*cloud_provider_t.Asset) []*cloud_provider_t.Asset {
+	if len(assets) == 0 {
+		return nil
 	}
 
-	seen := make(map[string]struct{}, len(resources))
-	writeIdx := 0
-	for _, res := range resources {
-		if _, exists := seen[res]; exists {
+	byName := make(map[string]*cloud_provider_t.Asset, len(assets))
+	deduped := make([]*cloud_provider_t.Asset, 0, len(assets))
+	duplicates := 0
+
+	for _, asset := range assets {
+		if asset == nil || asset.Name == "" {
 			continue
 		}
-		seen[res] = struct{}{}
-		resources[writeIdx] = res
-		writeIdx++
+
+		if existing, ok := byName[asset.Name]; ok {
+			existing.Tags = mergeTags(existing.Tags, asset.Tags)
+			duplicates++
+			continue
+		}
+
+		canonical := &cloud_provider_t.Asset{
+			Name: asset.Name,
+			Tags: mergeTags(nil, asset.Tags),
+		}
+		byName[canonical.Name] = canonical
+		deduped = append(deduped, canonical)
 	}
 
-	logger.GetLogger(ctx).Trace().Msgf("Removed %d duplicates", len(resources)-writeIdx)
+	logger.GetLogger(ctx).Trace().Msgf("Removed %d duplicates", duplicates)
 
-	return resources[:writeIdx]
+	return deduped
 }
 
-func normalise(ctx context.Context, resources []string) []string {
-	if len(resources) == 0 {
+func normalise(ctx context.Context, assets []*cloud_provider_t.Asset) []*cloud_provider_t.Asset {
+	if len(assets) == 0 {
 		return nil
 	}
 
 	log := logger.GetLogger(ctx)
-	normalised := make([]string, 0, len(resources))
+	normalised := make([]*cloud_provider_t.Asset, 0, len(assets))
 
-	for _, raw := range resources {
-		value, ok := normaliseResource(raw)
-		if !ok {
-			log.Warn().Str("resource", raw).Msg("Unable to normalise resource")
+	for _, asset := range assets {
+		if asset == nil {
+			log.Warn().Msg("Skipping nil asset")
 			continue
 		}
 
-		normalised = append(normalised, value)
-		if raw != value {
-			log.Debug().Str("resource", raw).Str("normalised", value).Msgf("'%s' was normalised to '%s'", raw, value)
+		value, ok := normaliseResource(asset.Name)
+		if !ok {
+			log.Warn().Str("resource", asset.Name).Msg("Unable to normalise resource")
+			continue
+		}
+
+		normalised = append(normalised, &cloud_provider_t.Asset{
+			Name: value,
+			Tags: mergeTags(nil, asset.Tags),
+		})
+		if asset.Name != value {
+			log.Debug().Str("resource", asset.Name).Str("normalised", value).Msgf("'%s' was normalised to '%s'", asset.Name, value)
 		}
 
 	}
 
 	return normalised
+}
+
+func mergeTags(base []string, extra []string) []string {
+	if len(base) == 0 && len(extra) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(base)+len(extra))
+	merged := make([]string, 0, len(base)+len(extra))
+
+	for _, tag := range append(append([]string{}, base...), extra...) {
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		merged = append(merged, tag)
+	}
+
+	if len(merged) == 0 {
+		return nil
+	}
+
+	return merged
+}
+
+func assetTags(asset *cloud_provider_t.Asset, seedTag string) []string {
+	tags := mergeTags(asset.Tags, []string{seedTag})
+	slices.Sort(tags)
+	return tags
 }
 
 func normaliseResource(raw string) (string, bool) {

@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/mock"
 
 	"github.com/hexiosec/asm-cloud-connector/internal/api"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
 	asm "github.com/hexiosec/asm-sdk-go"
 )
@@ -106,12 +107,12 @@ func TestSyncResources_Normalise_Success(t *testing.T) {
 		Return(&asm.NodeResponse{}, nil, nil).
 		Once()
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-		"https://Example.COM ",
-		"example2.com",
-		"example.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(
+		asset("example.com"),
+		asset("https://Example.COM "),
+		asset("example2.com"),
+		asset("example.com"),
+	))
 	assert.NoError(t, err)
 }
 
@@ -138,10 +139,10 @@ func TestSyncResources_ExistingSeed_Skipped(t *testing.T) {
 		Return(&asm.NodeResponse{}, nil, nil).
 		Once()
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-		"existing.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(
+		asset("example.com"),
+		asset("existing.com"),
+	))
 	assert.NoError(t, err)
 }
 
@@ -154,10 +155,10 @@ func TestSyncResources_GetSeedsErr_Err(t *testing.T) {
 
 	mockAPI.On("GetScanSeedsById", cfg.ScanID).Return(nil, nil, assert.AnError)
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-		"existing.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(
+		asset("example.com"),
+		asset("existing.com"),
+	))
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, assert.AnError)
 }
@@ -172,10 +173,10 @@ func TestSyncResources_IPv6Resource_Skipped(t *testing.T) {
 	mockAPI.On("GetScanSeedsById", cfg.ScanID).
 		Return([]asm.SeedsResponseInner{}, nil, nil)
 
-	err := conn.SyncResources(context.Background(), []string{
-		"2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-		"2345:0425:2CA1::0567:5673:23b5",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(
+		asset("2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+		asset("2345:0425:2CA1::0567:5673:23b5"),
+	))
 	assert.NoError(t, err)
 }
 
@@ -191,9 +192,7 @@ func TestSyncResources_AddSeed_500_Err(t *testing.T) {
 
 	mockAPI.On("AddScanSeedById", cfg.ScanID, mock.Anything).Return(nil, &http.Response{StatusCode: 500}, assert.AnError)
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(asset("example.com")))
 	assert.Error(t, err)
 	assert.ErrorAs(t, err, &assert.AnError)
 }
@@ -215,9 +214,7 @@ func TestSyncResources_AddSeed_400WithValidBody_NonFatalCase_Skipped(t *testing.
 		assert.AnError,
 	)
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(asset("example.com")))
 	assert.NoError(t, err)
 }
 
@@ -238,9 +235,7 @@ func TestSyncResources_AddSeed_400WithInValidBody_FatalCase_Err(t *testing.T) {
 		assert.AnError,
 	)
 
-	err := conn.SyncResources(context.Background(), []string{
-		"example.com",
-	})
+	err := conn.SyncResources(context.Background(), assetSlice(asset("example.com")))
 	assert.Error(t, err)
 	assert.ErrorAs(t, err, &assert.AnError)
 }
@@ -264,7 +259,7 @@ func TestSyncResources_RemovesStaleSeedsWithTag_Success(t *testing.T) {
 		Return(&http.Response{}, nil).
 		Once()
 
-	err := conn.SyncResources(context.Background(), []string{"keep.com"})
+	err := conn.SyncResources(context.Background(), assetSlice(asset("keep.com")))
 	assert.NoError(t, err)
 }
 
@@ -292,15 +287,15 @@ func TestSyncResources_DeleteSeedFails_Continue(t *testing.T) {
 		Return(nil, assert.AnError).
 		Once()
 
-	err := conn.SyncResources(context.Background(), []string{"keep.com"})
+	err := conn.SyncResources(context.Background(), assetSlice(asset("keep.com")))
 	assert.NoError(t, err)
 }
 
 func TestDedup(t *testing.T) {
 	tests := []struct {
 		name     string
-		input    []string
-		expected []string
+		input    []*cloud_provider_t.Asset
+		expected []*cloud_provider_t.Asset
 	}{
 		{
 			name:     "NilSlice_ReturnsNil",
@@ -309,74 +304,69 @@ func TestDedup(t *testing.T) {
 		},
 		{
 			name:     "SingleItem_Unchanged",
-			input:    []string{"a"},
-			expected: []string{"a"},
+			input:    assetSlice(asset("a")),
+			expected: assetSlice(asset("a")),
 		},
 		{
 			name:     "NoDuplicates_Unchanged",
-			input:    []string{"a", "b", "c"},
-			expected: []string{"a", "b", "c"},
+			input:    assetSlice(asset("a"), asset("b"), asset("c")),
+			expected: assetSlice(asset("a"), asset("b"), asset("c")),
 		},
 		{
-			name:     "ContiguousDuplicates_Removed",
-			input:    []string{"a", "a", "b", "b"},
-			expected: []string{"a", "b"},
+			name:  "Duplicates_MergeTags",
+			input: assetSlice(assetWithTags("a", "one"), assetWithTags("a", "two"), asset("b"), assetWithTags("b", "three")),
+			expected: assetSlice(
+				assetWithTags("a", "one", "two"),
+				assetWithTags("b", "three"),
+			),
 		},
 		{
-			name:     "NonContiguousDuplicates_Removed",
-			input:    []string{"a", "b", "a", "c", "b"},
-			expected: []string{"a", "b", "c"},
-		},
-		{
-			name:     "AllDuplicates_ReturnsOne",
-			input:    []string{"x", "x", "x"},
-			expected: []string{"x"},
+			name:     "NilAndEmptyNames_Skipped",
+			input:    assetSlice(nil, asset(""), asset("x")),
+			expected: assetSlice(asset("x")),
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			var inputCopy []string
+			var inputCopy []*cloud_provider_t.Asset
 			if tc.input != nil {
-				inputCopy = make([]string, len(tc.input))
+				inputCopy = make([]*cloud_provider_t.Asset, len(tc.input))
 				copy(inputCopy, tc.input)
 			}
 
 			got := dedup(context.Background(), inputCopy)
 
 			assert.Equal(t, tc.expected, got)
-			if inputCopy != nil {
-				assert.Equal(t, tc.expected, inputCopy[:len(got)])
-			}
 		})
 	}
 }
 
 func TestNormalise(t *testing.T) {
-	input := []string{
-		"http://Example.com/path",
-		"https://user:pass@Sub.Domain.COM:8443/anything?query=1",
-		" 192.168.0.1 ",
-		"2001:db8::1",
-		"[2001:db8::1]",
-		"not a domain",
-		"https://[2001:db8::2]:443/foo",
-		"ftp://user@host.example.org",
-		"*.cloudrun.regr.creepycrawly.io.",
-	}
+	input := assetSlice(
+		assetWithTags("http://Example.com/path", "one"),
+		asset("https://user:pass@Sub.Domain.COM:8443/anything?query=1"),
+		asset(" 192.168.0.1 "),
+		asset("2001:db8::1"),
+		asset("[2001:db8::1]"),
+		asset("not a domain"),
+		asset("https://[2001:db8::2]:443/foo"),
+		asset("ftp://user@host.example.org"),
+		asset("*.cloudrun.regr.creepycrawly.io."),
+	)
 
 	got := normalise(context.Background(), input)
 
-	expected := []string{
-		"example.com",
-		"sub.domain.com",
-		"192.168.0.1",
-		"2001:db8::1",
-		"2001:db8::1",
-		"2001:db8::2",
-		"host.example.org",
-		"cloudrun.regr.creepycrawly.io",
-	}
+	expected := assetSlice(
+		assetWithTags("example.com", "one"),
+		asset("sub.domain.com"),
+		asset("192.168.0.1"),
+		asset("2001:db8::1"),
+		asset("2001:db8::1"),
+		asset("2001:db8::2"),
+		asset("host.example.org"),
+		asset("cloudrun.regr.creepycrawly.io"),
+	)
 
 	assert.Equal(t, expected, got)
 }
@@ -388,17 +378,58 @@ func TestNormalise_Invalid_LogsWarn(t *testing.T) {
 	log.Logger = zerolog.New(&buf)
 	t.Cleanup(func() { log.Logger = prevLogger })
 
-	got := normalise(context.Background(), []string{
-		"",
-		"://",
-		"???",
-		"ftp://",
-		".",
-		"-example.com",
-	})
+	got := normalise(context.Background(), assetSlice(
+		nil,
+		asset(""),
+		asset("://"),
+		asset("???"),
+		asset("ftp://"),
+		asset("."),
+		asset("-example.com"),
+	))
 
 	assert.Empty(t, got)
 	assert.Contains(t, buf.String(), "Unable to normalise resource")
+}
+
+func TestSyncResources_MergesAssetTagsBeforeCreate(t *testing.T) {
+	cfg := &config.Config{
+		ScanID:  "scan-123",
+		SeedTag: "seed-tag",
+	}
+	conn, mockAPI := newTestConnector(t, cfg)
+
+	mockAPI.On("GetScanSeedsById", cfg.ScanID).
+		Return([]asm.SeedsResponseInner{}, nil, nil)
+
+	mockAPI.On("AddScanSeedById", cfg.ScanID, mock.MatchedBy(func(req asm.CreateScanSeedRequest) bool {
+		expected := asm.CreateScanSeedRequest{
+			Name: "example.com",
+			Type: resourceDomain,
+			Tags: []string{"alpha", "beta", cfg.SeedTag},
+		}
+		return reflect.DeepEqual(req, expected)
+	})).
+		Return(&asm.NodeResponse{}, nil, nil).
+		Once()
+
+	err := conn.SyncResources(context.Background(), assetSlice(
+		assetWithTags("Example.com", "beta"),
+		assetWithTags("https://example.com", "alpha", "beta"),
+	))
+	assert.NoError(t, err)
+}
+
+func asset(name string) *cloud_provider_t.Asset {
+	return &cloud_provider_t.Asset{Name: name}
+}
+
+func assetWithTags(name string, tags ...string) *cloud_provider_t.Asset {
+	return &cloud_provider_t.Asset{Name: name, Tags: tags}
+}
+
+func assetSlice(assets ...*cloud_provider_t.Asset) []*cloud_provider_t.Asset {
+	return assets
 }
 
 func TestGetErrorCode_Success(t *testing.T) {

@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-
 	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestAzureProvider_GetAPIKey_NoSecret(t *testing.T) {
@@ -49,12 +48,12 @@ func TestAzureProvider_GetResources_UsesEnabledServices(t *testing.T) {
 	})
 
 	wrapper.On("InitResourceGraph").Return(nil)
-	wrapper.On("GetAppServiceHostnames").Return([]string{"app.azurewebsites.net"}, nil)
+	wrapper.On("GetAppServiceHostnames").Return(assetSlice("app.azurewebsites.net"), nil)
 
 	resources, err := provider.GetResources(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"app.azurewebsites.net"}, resources)
+	assert.Equal(t, assetSlice("app.azurewebsites.net"), resources)
 	wrapper.AssertNotCalled(t, "GetSQLServerFQDNs")
 }
 
@@ -68,12 +67,12 @@ func TestAzureProvider_GetResources_ContinuesOnError(t *testing.T) {
 
 	wrapper.On("InitResourceGraph").Return(nil)
 	wrapper.On("GetPublicIPs").Return(nil, assert.AnError)
-	wrapper.On("GetPublicIPDNSNames").Return([]string{"example.azure.com"}, nil)
+	wrapper.On("GetPublicIPDNSNames").Return(assetSlice("example.azure.com"), nil)
 
 	resources, err := provider.GetResources(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"example.azure.com"}, resources)
+	assert.Equal(t, assetSlice("example.azure.com"), resources)
 }
 
 func TestAzureProvider_GetResources_ApplicationGatewayCertificates(t *testing.T) {
@@ -85,12 +84,12 @@ func TestAzureProvider_GetResources_ApplicationGatewayCertificates(t *testing.T)
 	})
 
 	wrapper.On("InitResourceGraph").Return(nil)
-	wrapper.On("GetApplicationGatewayCertificateDomains").Return([]string{"cert.example.com"}, nil)
+	wrapper.On("GetApplicationGatewayCertificateDomains").Return(assetSlice("cert.example.com"), nil)
 
 	resources, err := provider.GetResources(context.Background())
 
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"cert.example.com"}, resources)
+	assert.Equal(t, assetSlice("cert.example.com"), resources)
 }
 
 func TestAzureProvider_GetResources_InitResourceGraphError(t *testing.T) {
@@ -118,4 +117,12 @@ func newProviderWithWrapper(t *testing.T, cfg *config.AzureCloudProvider) (*Azur
 		wrapper: wrapper,
 	}
 	return provider, wrapper
+}
+
+func assetSlice(names ...string) []*cloud_provider_t.Asset {
+	assets := make([]*cloud_provider_t.Asset, 0, len(names))
+	for _, name := range names {
+		assets = append(assets, &cloud_provider_t.Asset{Name: name})
+	}
+	return assets
 }

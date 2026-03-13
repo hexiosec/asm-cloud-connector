@@ -53,6 +53,7 @@ delete_stale_seeds: true
 aws:
   enabled: true
   api_key_secret: asm-cloud-connector/api-key
+  populate_tags: true
   default_region: eu-west-2
   list_all_accounts: false
   accounts: []
@@ -102,6 +103,7 @@ Environment variables override YAML values.
 | `seed_tag`              | Label applied to all seeds created by this connector.                                                                                          |
 | `delete_stale_seeds`    | Whether to remove resources no longer present in AWS.                                                                                          |
 | `aws.api_key_secret`    | Path to the ASM API key secret in AWS Secrets Manager.                                                                                         |
+| `aws.populate_tags`     | Whether AWS resource tags should be attached to discovered assets. Defaults to `true`; set `false` to disable all AWS tag lookups.             |
 | `aws.default_region`    | Default AWS region to query.                                                                                                                   |
 | `aws.services.*`        | Toggles for individual AWS service checks.                                                                                                     |
 | `aws.assume_role`       | Role name to assume when scanning multiple accounts. The Cloud Connector constructs the ARN as `arn:aws:iam::<ACCOUNT_ID>:role/<assume_role>`. |
@@ -145,6 +147,8 @@ The policy below lists the **complete set of discovery permissions** needed for 
 This list is the same regardless of whether you deploy via **Lambda** or **Fargate**.  
 Additional IAM requirements specific to each deployment method (such as trust policies and Secrets Manager/SSM access) are described in **section 6 (Lambda)** and **section 7 (Fargate)**.
 
+If `aws.populate_tags` is left at its default value of `true`, the connector also needs the tag-read actions shown below. If you set `aws.populate_tags: false`, you can omit those extra tag-read permissions and the connector will still discover assets without attaching AWS resource tags.
+
 ```json
 {
   "Version": "2012-10-17",
@@ -154,20 +158,28 @@ Additional IAM requirements specific to each deployment method (such as trust po
       "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:DescribeTags",
         "route53:List*",
+        "route53:ListTagsForResource",
         "s3:ListAllMyBuckets",
+        "s3:GetBucketTagging",
         "s3:GetBucketWebsite",
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketAcl",
         "s3:GetBucketPolicy",
         "cloudfront:ListDistributions",
+        "cloudfront:ListTagsForResource",
         "acm:ListCertificates",
+        "acm:ListTagsForCertificate",
         "apigateway:GET",
         "eks:ListClusters",
         "rds:Describe*",
+        "rds:ListTagsForResource",
         "es:ListDomainNames",
         "es:ListApplications",
+        "es:ListTags",
         "lambda:ListFunctions",
+        "lambda:ListTags",
         "lambda:GetFunctionUrlConfig"
       ],
       "Resource": "*"
@@ -265,20 +277,28 @@ cat > lambda-permissions.json << 'EOF'
       "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:DescribeTags",
         "route53:List*",
+        "route53:ListTagsForResource",
         "s3:ListAllMyBuckets",
+        "s3:GetBucketTagging",
         "s3:GetBucketWebsite",
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketAcl",
         "s3:GetBucketPolicy",
         "cloudfront:ListDistributions",
+        "cloudfront:ListTagsForResource",
         "acm:ListCertificates",
+        "acm:ListTagsForCertificate",
         "apigateway:GET",
         "eks:ListClusters",
         "rds:Describe*",
+        "rds:ListTagsForResource",
         "es:ListDomainNames",
         "es:ListApplications",
+        "es:ListTags",
         "lambda:ListFunctions",
+        "lambda:ListTags",
         "lambda:GetFunctionUrlConfig"
       ],
       "Resource": "*"
@@ -367,9 +387,17 @@ cat > cross-account-policy.json << 'EOF'
       "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:DescribeTags",
         "route53:List*",
+        "route53:ListTagsForResource",
         "s3:ListAllMyBuckets",
+        "s3:GetBucketTagging",
+        "s3:GetBucketWebsite",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketAcl",
+        "s3:GetBucketPolicy",
         "cloudfront:ListDistributions",
+        "cloudfront:ListTagsForResource",
         "acm:ListCertificates"
       ],
       "Resource": "*"
@@ -529,20 +557,28 @@ cat > ecs-permissions.json << 'EOF'
       "Action": [
         "ec2:Describe*",
         "elasticloadbalancing:Describe*",
+        "elasticloadbalancing:DescribeTags",
         "route53:List*",
+        "route53:ListTagsForResource",
         "s3:ListAllMyBuckets",
+        "s3:GetBucketTagging",
         "s3:GetBucketWebsite",
         "s3:GetBucketPublicAccessBlock",
         "s3:GetBucketAcl",
         "s3:GetBucketPolicy",
         "cloudfront:ListDistributions",
+        "cloudfront:ListTagsForResource",
         "acm:ListCertificates",
+        "acm:ListTagsForCertificate",
         "apigateway:GET",
         "eks:ListClusters",
         "rds:Describe*",
+        "rds:ListTagsForResource",
         "es:ListDomainNames",
         "es:ListApplications",
+        "es:ListTags",
         "lambda:ListFunctions",
+        "lambda:ListTags",
         "lambda:GetFunctionUrlConfig"
       ],
       "Resource": "*"
@@ -835,15 +871,16 @@ We recommend:
 
 ## 11. Troubleshooting
 
-| Issue                              | Cause                                      | Fix                                                                                                    |
-| ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| Authentication errors              | Invalid or missing API key/secret path     | Confirm the secret exists in Secrets Manager, matches `aws.api_key_secret`, and is readable.           |
-| No resources found                 | Insufficient IAM permissions               | Review IAM role policies and ensure required `Describe`/`List` actions are present.                    |
-| Timeout                            | Lambda execution too long                  | Increase Lambda timeout or switch to Fargate for larger environments.                                  |
-| Cannot reach Hexiosec ASM endpoint | Restricted network egress from VPC/subnets | Allow outbound HTTPS to the Hexiosec ASM API (for example, via a NAT gateway, VPC endpoint, or proxy). |
-| “AccessDenied” for SSM             | Missing `ssm:GetParameter` permission      | Add SSM read permissions for the Cloud Connector’s SSM parameter ARN.                                  |
-| “AccessDenied” for secrets         | Missing `secretsmanager:GetSecretValue`    | Add Secrets Manager read permissions for the `asm-cloud-connector/api-key` secret ARN.                 |
-| Missing seeds in ASM               | Wrong or misconfigured `scan_id`           | Confirm `scan_id` in config matches the target ASM scan and re-run the Cloud Connector.                |
+| Issue                              | Cause                                      | Fix                                                                                                                                                      |
+| ---------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication errors              | Invalid or missing API key/secret path     | Confirm the secret exists in Secrets Manager, matches `aws.api_key_secret`, and is readable.                                                             |
+| No resources found                 | Insufficient IAM permissions               | Review IAM role policies and ensure required `Describe`/`List` actions are present.                                                                      |
+| “AccessDenied” when reading tags   | Missing AWS tag-read permissions           | Add the required tag-read actions such as `ListTags`/`DescribeTags`, or set `aws.populate_tags: false` if you do not need AWS tags on discovered assets. |
+| Timeout                            | Lambda execution too long                  | Increase Lambda timeout or switch to Fargate for larger environments.                                                                                    |
+| Cannot reach Hexiosec ASM endpoint | Restricted network egress from VPC/subnets | Allow outbound HTTPS to the Hexiosec ASM API (for example, via a NAT gateway, VPC endpoint, or proxy).                                                   |
+| “AccessDenied” for SSM             | Missing `ssm:GetParameter` permission      | Add SSM read permissions for the Cloud Connector’s SSM parameter ARN.                                                                                    |
+| “AccessDenied” for secrets         | Missing `secretsmanager:GetSecretValue`    | Add Secrets Manager read permissions for the `asm-cloud-connector/api-key` secret ARN.                                                                   |
+| Missing seeds in ASM               | Wrong or misconfigured `scan_id`           | Confirm `scan_id` in config matches the target ASM scan and re-run the Cloud Connector.                                                                  |
 
 ---
 

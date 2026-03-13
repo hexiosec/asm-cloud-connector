@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0]
+
+- Added AWS tag collection for discovered assets and propagation of those tags to ASM seed creation, with support across the current AWS resource discovery set.
+- Added `aws.populate_tags` configuration, defaulting to `true`, to let deployments disable AWS tag collection and the related tag-read API calls.
+- Changed internal resource handling from raw strings to `Asset{Name, Tags}` objects so provider metadata can flow through to connector seed creation.
+- Updated connector deduplication and normalisation to preserve and merge asset tags before appending the configured seed tag.
+- Updated AWS deployment documentation with `aws.populate_tags`, required tag-read IAM permissions.
+- Updated AWS, Azure, GCP, and supporting SDK dependencies.
+
 ## [1.3.0]
 
 - Added Azure connector deployment documentation

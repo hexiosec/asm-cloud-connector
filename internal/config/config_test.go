@@ -41,6 +41,8 @@ func Test_DefaultConfigParsing_Success(t *testing.T) {
 	assert.Equal(t, 1*time.Second, config.Http.RetryBaseDelay) // Default value
 	assert.Equal(t, 5*time.Second, config.Http.RetryMaxDelay)  // Default value
 	assert.Nil(t, config.AWS.AssumeRole)
+	require.NotNil(t, config.AWS.PopulateTags)
+	assert.True(t, *config.AWS.PopulateTags)
 }
 
 func Test_NoCloudProviders_Fails(t *testing.T) {
@@ -262,6 +264,29 @@ func Test_LoadFromEnvConfig_Success(t *testing.T) {
 	assert.Equal(t, "cloud_connector", config.SeedTag)
 	assert.True(t, config.DeleteStaleSeeds)
 	assert.True(t, config.AWS.Enabled)
+	require.NotNil(t, config.AWS.PopulateTags)
+	assert.True(t, *config.AWS.PopulateTags)
+}
+
+func Test_AWSPopulateTags_ExplicitFalsePreserved(t *testing.T) {
+	testFile := []byte(strings.ReplaceAll(`
+		scan_id: 00000000-0000-0000-0000-000000000000
+		seed_tag: cloud_connector
+		aws:
+			enabled: true
+			populate_tags: false
+			default_region: region
+			services:
+				check_ec2: true
+	`, "\t", "  "))
+
+	cfgFilePath := t.TempDir() + "/config.yml"
+	err := os.WriteFile(cfgFilePath, testFile, 0777)
+	require.NoError(t, err)
+
+	config := Provider(cfgFilePath)
+	require.NotNil(t, config.AWS.PopulateTags)
+	assert.False(t, *config.AWS.PopulateTags)
 }
 
 func Test_LoadFromEnvConfig_InvalidYAML(t *testing.T) {

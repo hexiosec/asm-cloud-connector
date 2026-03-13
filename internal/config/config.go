@@ -77,6 +77,7 @@ type AWSCloudProvider struct {
 	AssumeRole      *string      `yaml:"assume_role,omitempty" validate:"required_with=Accounts ListAllAccounts"`
 	Services        *AWSServices `yaml:"services,omitempty" validate:"required_with=Enabled"`
 	APIKeySecret    *string      `yaml:"api_key_secret,omitempty"`
+	PopulateTags    *bool        `yaml:"populate_tags,omitempty"`
 	DefaultRegion   string       `yaml:"default_region" validate:"required"`
 }
 
@@ -183,6 +184,10 @@ func setDefaults(config *Config) {
 	}
 	if config.SeedTag == "" {
 		config.SeedTag = "cloud-connector"
+	}
+	if config.AWS != nil && config.AWS.PopulateTags == nil {
+		config.AWS.PopulateTags = new(bool)
+		*config.AWS.PopulateTags = true
 	}
 }
 

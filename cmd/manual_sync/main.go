@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/hexiosec/asm-cloud-connector/internal/api"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
 	"github.com/hexiosec/asm-cloud-connector/internal/connector"
 	"github.com/hexiosec/asm-cloud-connector/internal/logger"
@@ -66,8 +67,12 @@ func main() {
 		log.Fatal().Msg("No resources have been provided")
 	}
 
-	resources := flag.Args()
-	log.Info().Interface("resources", resources).Msgf("%d resources", len(resources))
+	args := flag.Args()
+	assets := make([]*cloud_provider_t.Asset, 0, len(args))
+	for _, resource := range args {
+		assets = append(assets, &cloud_provider_t.Asset{Name: resource})
+	}
+	log.Info().Interface("resources", assets).Msgf("%d resources", len(assets))
 
 	cfg := &config.Config{
 		ScanID:           *scanID,
@@ -94,7 +99,7 @@ func main() {
 		log.Fatal().Err(err).Msg("Could not authenticate with Hexiosec ASM connector")
 	}
 
-	if err := conn.SyncResources(ctx, resources); err != nil {
+	if err := conn.SyncResources(ctx, assets); err != nil {
 		log.Fatal().Err(err).Msg("Could not sync resources with Hexiosec ASM connector")
 	}
 

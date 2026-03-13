@@ -51,10 +51,10 @@ func (c *GCPProvider) GetAPIKey(ctx context.Context) (string, error) {
 	return "", cloud_provider_t.ErrNoAPIKey
 }
 
-func (c *GCPProvider) GetResources(ctx context.Context) ([]string, error) {
+func (c *GCPProvider) GetResources(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	defs := map[string]struct {
 		enabled bool
-		getter  func(ctx context.Context, asset *assetpb.Asset, data map[string]any) ([]string, error)
+		getter  func(ctx context.Context, asset *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error)
 	}{
 		"dns.googleapis.com/ResourceRecordSet": {
 			enabled: c.cfg.Services.CheckDNSResourceRecordSet,
@@ -126,7 +126,7 @@ func (c *GCPProvider) GetResources(ctx context.Context) ([]string, error) {
 	}
 	logger.GetLogger(ctx).Debug().Strs("asset_types", enabledAssetTypes).Msg("enabled asset types")
 
-	var resources []string
+	var resources []*cloud_provider_t.Asset
 	for _, project := range c.cfg.Projects {
 		logger.GetLogger(ctx).Debug().Msgf("searching project %s", project)
 		if len(enabledAssetTypes) > 0 {
@@ -176,11 +176,11 @@ func (c *GCPProvider) GetResources(ctx context.Context) ([]string, error) {
 	return resources, nil
 }
 
-func extractDomainsFromCertificates(certificates []*certificatemanagerpb.Certificate) []string {
-	var domains []string
+func extractDomainsFromCertificates(certificates []*certificatemanagerpb.Certificate) []*cloud_provider_t.Asset {
+	var domains []*cloud_provider_t.Asset
 	for _, cert := range certificates {
 		for _, san := range cert.GetSanDnsnames() {
-			domains = append(domains, strings.TrimSuffix(san, "."))
+			domains = append(domains, &cloud_provider_t.Asset{Name: strings.TrimSuffix(san, ".")})
 		}
 	}
 
@@ -191,52 +191,52 @@ func isIP(s string) bool {
 	return net.ParseIP(s) != nil
 }
 
-func (c *GCPProvider) getResourcesFromResourceRecordSet(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromResourceRecordSet(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	r := resourceRecordSet{}
 	if err := util.MapStructDecodeAndValidate(data, &r); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
-	var resources []string
+	var resources []*cloud_provider_t.Asset
 
 	// Only keep resource names when the DNS record is for a subdomain
 	// Other records will be found & created by ASM
 	if r.Name != nil && r.Type != nil && *r.Name != "" {
 		t := strings.ToUpper(*r.Type)
 		if t == "A" || t == "AAAA" || t == "CNAME" {
-			resources = append(resources, *r.Name)
+			resources = append(resources, &cloud_provider_t.Asset{Name: *r.Name})
 		}
 	}
 
 	// Always keep IP data from the record
 	for _, v := range r.RRDatas {
 		if v != nil && isIP(*v) {
-			resources = append(resources, *v)
+			resources = append(resources, &cloud_provider_t.Asset{Name: *v})
 		}
 	}
 
 	return resources, nil
 }
 
-func (c *GCPProvider) getResourcesFromManagedZone(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromManagedZone(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	if dns, ok := data["dnsName"].(string); ok && dns != "" {
-		return []string{dns}, nil
+		return []*cloud_provider_t.Asset{newAsset(dns)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromInstance(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromInstance(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	i := instance{}
 	if err := util.MapStructDecodeAndValidate(data, &i); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
-	var resources []string
+	var resources []*cloud_provider_t.Asset
 	for _, n := range i.NetworkInterfaces {
 		for _, ac := range n.AccessConfigs {
 			if ac.NatIP != nil {
-				resources = append(resources, *ac.NatIP)
+				resources = append(resources, &cloud_provider_t.Asset{Name: *ac.NatIP})
 			}
 		}
 	}
@@ -244,20 +244,20 @@ func (c *GCPProvider) getResourcesFromInstance(_ context.Context, _ *assetpb.Ass
 	return resources, nil
 }
 
-func (c *GCPProvider) getResourcesFromAddress(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromAddress(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	a := address{}
 	if err := util.MapStructDecodeAndValidate(data, &a); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
 	if a.Address != nil && a.Type != nil && *a.Type == "EXTERNAL" {
-		return []string{*a.Address}, nil
+		return []*cloud_provider_t.Asset{newAsset(*a.Address)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromBucket(ctx context.Context, asset *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromBucket(ctx context.Context, asset *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	fullName, ok := data["name"].(string)
 	if !ok {
 		return nil, nil
@@ -270,95 +270,95 @@ func (c *GCPProvider) getResourcesFromBucket(ctx context.Context, asset *assetpb
 	}
 
 	if c.wrapper.IsBucketPublic(ctx, bucketName) {
-		return []string{fmt.Sprintf("https://%s.storage.googleapis.com/", bucketName)}, nil
+		return []*cloud_provider_t.Asset{newAsset(fmt.Sprintf("https://%s.storage.googleapis.com/", bucketName))}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromFunction(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromFunction(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	f := function{}
 	if err := util.MapStructDecodeAndValidate(data, &f); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
 	if f.HTTPSTrigger != nil && f.HTTPSTrigger.URL != nil {
-		return []string{*f.HTTPSTrigger.URL}, nil
+		return []*cloud_provider_t.Asset{newAsset(*f.HTTPSTrigger.URL)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromRunService(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromRunService(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	s := service{}
 	if err := util.MapStructDecodeAndValidate(data, &s); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
 	if s.Status != nil && s.Status.URL != nil {
-		return []string{*s.Status.URL}, nil
+		return []*cloud_provider_t.Asset{newAsset(*s.Status.URL)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromDomainMapping(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromDomainMapping(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	dm := domainMapping{}
 	if err := util.MapStructDecodeAndValidate(data, &dm); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
 	if dm.Metadata != nil && dm.Metadata.Name != nil {
-		return []string{*dm.Metadata.Name}, nil
+		return []*cloud_provider_t.Asset{newAsset(*dm.Metadata.Name)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromAPIGateway(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromAPIGateway(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	if hostname, ok := data["defaultHostname"].(string); ok && hostname != "" {
-		return []string{"https://" + hostname}, nil
+		return []*cloud_provider_t.Asset{newAsset("https://" + hostname)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromSQLInstance(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromSQLInstance(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	si := sqlInstance{}
 	if err := util.MapStructDecodeAndValidate(data, &si); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
-	var resources []string
+	var resources []*cloud_provider_t.Asset
 	for _, ip := range si.IPAddresses {
 		if ip != nil && ip.IPAddress != nil && ip.Type != nil && *ip.Type == "PRIMARY" {
-			resources = append(resources, *ip.IPAddress)
+			resources = append(resources, &cloud_provider_t.Asset{Name: *ip.IPAddress})
 		}
 	}
 
 	return resources, nil
 }
 
-func (c *GCPProvider) getResourcesFromForwardingRule(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromForwardingRule(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	f := forwardingRule{}
 	if err := util.MapStructDecodeAndValidate(data, &f); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
 	if f.IPAddress != nil && f.LoadBalancingScheme != nil && strings.HasPrefix(*f.LoadBalancingScheme, "EXTERNAL") {
-		return []string{*f.IPAddress}, nil
+		return []*cloud_provider_t.Asset{newAsset(*f.IPAddress)}, nil
 	}
 
 	return nil, nil
 }
 
-func (c *GCPProvider) getResourcesFromURLMap(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromURLMap(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	um := urlMap{}
 	if err := util.MapStructDecodeAndValidate(data, &um); err != nil {
 		return nil, &ValidationErr{err}
 	}
 
-	var resources []string
+	var resources []*cloud_provider_t.Asset
 	for _, hr := range um.HostRules {
 		if hr == nil {
 			continue
@@ -367,14 +367,14 @@ func (c *GCPProvider) getResourcesFromURLMap(_ context.Context, _ *assetpb.Asset
 			if h == nil || *h == "" {
 				continue
 			}
-			resources = append(resources, *h)
+			resources = append(resources, &cloud_provider_t.Asset{Name: *h})
 		}
 	}
 
 	return resources, nil
 }
 
-func (c *GCPProvider) getResourcesFromAppEngineService(_ context.Context, asset *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromAppEngineService(_ context.Context, asset *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	serviceID, ok := data["id"].(string)
 	if !ok || serviceID == "" {
 		return nil, nil
@@ -403,10 +403,10 @@ func (c *GCPProvider) getResourcesFromAppEngineService(_ context.Context, asset 
 		host = fmt.Sprintf("%s-dot-%s.appspot.com", serviceID, projectID)
 	}
 
-	return []string{host}, nil
+	return []*cloud_provider_t.Asset{newAsset(host)}, nil
 }
 
-func (c *GCPProvider) getResourcesFromCluster(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]string, error) {
+func (c *GCPProvider) getResourcesFromCluster(_ context.Context, _ *assetpb.Asset, data map[string]any) ([]*cloud_provider_t.Asset, error) {
 	cl := cluster{}
 	if err := util.MapStructDecodeAndValidate(data, &cl); err != nil {
 		return nil, &ValidationErr{err}
@@ -422,5 +422,9 @@ func (c *GCPProvider) getResourcesFromCluster(_ context.Context, _ *assetpb.Asse
 		return nil, nil
 	}
 
-	return []string{*cl.Endpoint}, nil
+	return []*cloud_provider_t.Asset{newAsset(*cl.Endpoint)}, nil
+}
+
+func newAsset(name string) *cloud_provider_t.Asset {
+	return &cloud_provider_t.Asset{Name: name}
 }

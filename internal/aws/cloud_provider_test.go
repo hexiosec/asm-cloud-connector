@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-
 	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestAWSProvider_GetAPIKey_NoSecret(t *testing.T) {
@@ -42,12 +41,12 @@ func TestAWSProvider_GetResources_DefaultAccountConfig(t *testing.T) {
 
 	mockWrapper.On("GetRegions").Return([]string{"us-east-1"}, nil)
 	mockWrapper.On("ChangeRegion", "us-east-1").Return()
-	mockWrapper.On("GetEC2Resources", mock.Anything).Return([]string{"i-1"}, nil).Once()
+	mockWrapper.On("GetEC2Resources", mock.Anything, true).Return(assetSlice("i-1"), nil).Once()
 	mockWrapper.On("ResetRegion").Return()
 
 	resources, err := provider.GetResources(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"i-1"}, resources)
+	assert.Equal(t, assetSlice("i-1"), resources)
 }
 
 func TestAWSProvider_GetResources_ListAllAccountsError(t *testing.T) {
@@ -87,12 +86,12 @@ func TestAWSProvider_GetResources_AssumeRolePerAccount(t *testing.T) {
 
 	child.On("GetRegions").Return([]string{"us-east-1"}, nil)
 	child.On("ChangeRegion", "us-east-1").Return()
-	child.On("GetEC2Resources", mock.Anything).Return([]string{"acct-res"}, nil).Once()
+	child.On("GetEC2Resources", mock.Anything, true).Return(assetSlice("acct-res"), nil).Once()
 	child.On("ResetRegion").Return()
 
 	resources, err := provider.GetResources(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"acct-res"}, resources)
+	assert.Equal(t, assetSlice("acct-res"), resources)
 }
 
 func TestAWSProvider_GetResources_AssumeRoleErr_Continue(t *testing.T) {
@@ -115,7 +114,7 @@ func TestAWSProvider_GetResources_AssumeRoleErr_Continue(t *testing.T) {
 
 	resources, err := provider.GetResources(context.Background())
 	assert.NoError(t, err)
-	assert.Equal(t, []string{}, resources)
+	assert.Empty(t, resources)
 }
 
 func Test_getResources_GetRegionsError(t *testing.T) {
@@ -124,7 +123,7 @@ func Test_getResources_GetRegionsError(t *testing.T) {
 
 	mockWrapper.On("GetRegions").Return(nil, assert.AnError)
 
-	_, err := getResources(context.Background(), mockWrapper, services, nil)
+	_, err := getResources(context.Background(), mockWrapper, services, nil, true)
 	assert.ErrorContains(t, err, "could not determine active regions")
 	assert.ErrorIs(t, err, assert.AnError)
 }
@@ -136,13 +135,31 @@ func Test_getResources_AggregatesResourcesAcrossRegions(t *testing.T) {
 	mockWrapper.On("GetRegions").Return([]string{"us-east-1", "us-west-2"}, nil)
 	mockWrapper.On("ChangeRegion", "us-east-1").Return()
 	mockWrapper.On("ChangeRegion", "us-west-2").Return()
-	mockWrapper.On("GetEC2Resources", mock.Anything).Return([]string{"res-east"}, nil).Once()
-	mockWrapper.On("GetEC2Resources", mock.Anything).Return([]string{"res-east", "res-west"}, nil).Once()
+	mockWrapper.On("GetEC2Resources", mock.Anything, true).Return(assetSlice("res-east"), nil).Once()
+	mockWrapper.On("GetEC2Resources", mock.Anything, true).Return(assetSlice("res-east", "res-west"), nil).Once()
 	mockWrapper.On("ResetRegion").Return()
 
-	resources, err := getResources(context.Background(), mockWrapper, services, []string{})
+	resources, err := getResources(context.Background(), mockWrapper, services, []*cloud_provider_t.Asset{}, true)
 	assert.NoError(t, err)
-	assert.Equal(t, []string{"res-east", "res-west"}, resources)
+	assert.Equal(t, assetSlice("res-east", "res-west"), resources)
+}
+
+func TestAWSProvider_GetResources_PopulateTagsDisabled_PassesFalse(t *testing.T) {
+	disabled := false
+	cfg := &config.AWSCloudProvider{
+		PopulateTags: &disabled,
+		Services:     &config.AWSServices{CheckEC2: true},
+	}
+	provider, mockWrapper := newProviderWithMock(t, cfg)
+
+	mockWrapper.On("GetRegions").Return([]string{"us-east-1"}, nil)
+	mockWrapper.On("ChangeRegion", "us-east-1").Return()
+	mockWrapper.On("GetEC2Resources", mock.Anything, false).Return(assetSlice("i-1"), nil).Once()
+	mockWrapper.On("ResetRegion").Return()
+
+	resources, err := provider.GetResources(context.Background())
+	assert.NoError(t, err)
+	assert.Equal(t, assetSlice("i-1"), resources)
 }
 
 func newProviderWithMock(t *testing.T, cfg *config.AWSCloudProvider) (*AWSProvider, *MockWrapper) {
@@ -152,4 +169,12 @@ func newProviderWithMock(t *testing.T, cfg *config.AWSCloudProvider) (*AWSProvid
 		cfg:     cfg,
 		wrapper: wrapper,
 	}, wrapper
+}
+
+func assetSlice(names ...string) []*cloud_provider_t.Asset {
+	assets := make([]*cloud_provider_t.Asset, 0, len(names))
+	for _, name := range names {
+		assets = append(assets, &cloud_provider_t.Asset{Name: name})
+	}
+	return assets
 }

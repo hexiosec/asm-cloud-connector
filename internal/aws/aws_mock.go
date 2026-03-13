@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -61,69 +62,69 @@ func (m *MockWrapper) GetRegions(_ context.Context) ([]string, error) {
 	return getStringSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetEC2Resources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetEC2Resources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetEIPResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetEIPResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetELBResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetELBResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetS3Resources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetS3Resources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetACMResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetACMResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetRoute53Resources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetRoute53Resources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetCloudFrontResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetCloudFrontResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetAPIGatewayResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetAPIGatewayResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetAPIGatewayV2Resources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetAPIGatewayV2Resources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetEKSResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetEKSResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetRDSResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetRDSResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetOpenSearchResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetOpenSearchResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetLambdaResources(_ context.Context, resources []string) ([]string, error) {
-	args := m.Called(resources)
-	return getStringSlice(args.Get(0)), args.Error(1)
+func (m *MockWrapper) GetLambdaResources(_ context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
+	args := m.Called(resources, populateTags)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
 func getStringSlice(value interface{}) []string {
@@ -131,4 +132,11 @@ func getStringSlice(value interface{}) []string {
 		return nil
 	}
 	return value.([]string)
+}
+
+func getAssetSlice(value interface{}) []*cloud_provider_t.Asset {
+	if value == nil {
+		return nil
+	}
+	return value.([]*cloud_provider_t.Asset)
 }

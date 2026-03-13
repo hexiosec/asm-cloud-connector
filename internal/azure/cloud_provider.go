@@ -42,16 +42,16 @@ func (c *AzureProvider) GetAPIKey(ctx context.Context) (string, error) {
 	return "", cloud_provider_t.ErrNoAPIKey
 }
 
-func (c *AzureProvider) GetResources(ctx context.Context) ([]string, error) {
+func (c *AzureProvider) GetResources(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	if err := c.wrapper.InitResourceGraph(ctx); err != nil {
 		logger.GetLogger(ctx).Warn().Err(err).Msgf("failed to create azure resource graph client, unable to check for any resources")
-		return []string{}, nil
+		return []*cloud_provider_t.Asset{}, nil
 	}
 
 	defs := []struct {
 		name    string
 		enabled bool
-		f       func(ctx context.Context) ([]string, error)
+		f       func(ctx context.Context) ([]*cloud_provider_t.Asset, error)
 	}{
 		{"Public IPs", c.cfg.Services.CheckPublicIPAddresses, c.wrapper.GetPublicIPs},
 		{"Public IP DNS", c.cfg.Services.CheckPublicIPAddresses, c.wrapper.GetPublicIPDNSNames},
@@ -70,7 +70,7 @@ func (c *AzureProvider) GetResources(ctx context.Context) ([]string, error) {
 		{"Redis", c.cfg.Services.CheckRedisCache, c.wrapper.GetRedisHostnames},
 	}
 
-	resources := []string{}
+	resources := []*cloud_provider_t.Asset{}
 	for _, def := range defs {
 		if !def.enabled {
 			logger.GetLogger(ctx).Trace().Msgf("skipping %s discovery; check disabled", def.name)

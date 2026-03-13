@@ -47,10 +47,12 @@ func (c *AWSProvider) GetAPIKey(ctx context.Context) (string, error) {
 	return c.wrapper.GetSecretString(ctx, *c.cfg.APIKeySecret)
 }
 
-func (c *AWSProvider) GetResources(ctx context.Context) ([]string, error) {
+func (c *AWSProvider) GetResources(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
+	populateTags := c.cfg.PopulateTags == nil || *c.cfg.PopulateTags
+
 	// Use the default config
 	if !c.cfg.ListAllAccounts && len(c.cfg.Accounts) == 0 {
-		return getResources(ctx, c.wrapper, c.cfg.Services, []string{})
+		return getResources(ctx, c.wrapper, c.cfg.Services, []*cloud_provider_t.Asset{}, populateTags)
 	}
 
 	var err error
@@ -62,7 +64,7 @@ func (c *AWSProvider) GetResources(ctx context.Context) ([]string, error) {
 		}
 	}
 
-	resources := []string{}
+	resources := []*cloud_provider_t.Asset{}
 	for _, account := range accounts {
 		ctx = logger.WithLogger(ctx, logger.GetLogger(ctx).With().Str("account", account).Logger())
 		role := fmt.Sprintf("arn:aws:iam::%s:role/%s", account, *c.cfg.AssumeRole)
@@ -74,7 +76,7 @@ func (c *AWSProvider) GetResources(ctx context.Context) ([]string, error) {
 			continue
 		}
 
-		resources, err = getResources(ctx, assumeWrapper, c.cfg.Services, resources)
+		resources, err = getResources(ctx, assumeWrapper, c.cfg.Services, resources, populateTags)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get resources for account %s %w", account, err)
 		}
@@ -83,7 +85,7 @@ func (c *AWSProvider) GetResources(ctx context.Context) ([]string, error) {
 	return resources, nil
 }
 
-func getResources(ctx context.Context, wrapper IAWSWrapper, services *config.AWSServices, resources []string) ([]string, error) {
+func getResources(ctx context.Context, wrapper IAWSWrapper, services *config.AWSServices, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	var err error
 
 	regions, err := wrapper.GetRegions(ctx)
@@ -94,7 +96,7 @@ func getResources(ctx context.Context, wrapper IAWSWrapper, services *config.AWS
 	defs := []struct {
 		name    string
 		enabled bool
-		f       func(ctx context.Context, resources []string) ([]string, error)
+		f       func(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
 	}{
 		{"EC2", services.CheckEC2, wrapper.GetEC2Resources},
 		{"EIP", services.CheckEIP, wrapper.GetEIPResources},
@@ -122,7 +124,7 @@ func getResources(ctx context.Context, wrapper IAWSWrapper, services *config.AWS
 			logger.GetLogger(ctx).Trace().Msgf("checking region %s", region)
 			wrapper.ChangeRegion(region)
 
-			resources, err = def.f(ctx, resources)
+			resources, err = def.f(ctx, resources, populateTags)
 			if err != nil {
 				logger.GetLogger(ctx).Warn().Err(err).Msgf("failed to get %s resources", def.name)
 			}

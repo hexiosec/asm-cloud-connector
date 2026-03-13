@@ -4,6 +4,7 @@ delete_stale_seeds: true
 aws:
   enabled: true
   api_key_secret: asm-cloud-connector/api-key
+  populate_tags: true
   default_region: eu-west-2
   services:
     check_ec2: true

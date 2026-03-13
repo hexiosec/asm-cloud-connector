@@ -11,27 +11,28 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resourcegraph/armresourcegraph"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/util"
 )
 
 type IAzureWrapper interface {
 	CheckConnection(ctx context.Context) error
 	InitResourceGraph(ctx context.Context) error
-	GetPublicIPs(ctx context.Context) ([]string, error)
-	GetPublicIPDNSNames(ctx context.Context) ([]string, error)
-	GetApplicationGatewayHostnames(ctx context.Context) ([]string, error)
-	GetApplicationGatewayCertificateDomains(ctx context.Context) ([]string, error)
-	GetFrontDoorClassicHostnames(ctx context.Context) ([]string, error)
-	GetFrontDoorAfdHostnames(ctx context.Context) ([]string, error)
-	GetTrafficManagerFQDNs(ctx context.Context) ([]string, error)
-	GetDNSZones(ctx context.Context) ([]string, error)
-	GetDNSRecordFQDNs(ctx context.Context) ([]string, error)
-	GetStorageWebEndpoints(ctx context.Context) ([]string, error)
-	GetCDNEndpointHostnames(ctx context.Context) ([]string, error)
-	GetAppServiceHostnames(ctx context.Context) ([]string, error)
-	GetSQLServerFQDNs(ctx context.Context) ([]string, error)
-	GetCosmosDocumentEndpoints(ctx context.Context) ([]string, error)
-	GetRedisHostnames(ctx context.Context) ([]string, error)
+	GetPublicIPs(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetPublicIPDNSNames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetApplicationGatewayHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetApplicationGatewayCertificateDomains(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetFrontDoorClassicHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetFrontDoorAfdHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetTrafficManagerFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetDNSZones(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetDNSRecordFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetStorageWebEndpoints(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetCDNEndpointHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetAppServiceHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetSQLServerFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetCosmosDocumentEndpoints(ctx context.Context) ([]*cloud_provider_t.Asset, error)
+	GetRedisHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error)
 }
 
 type AzureWrapper struct {
@@ -73,7 +74,7 @@ func (w *AzureWrapper) InitResourceGraph(ctx context.Context) error {
 	return nil
 }
 
-func (w *AzureWrapper) GetPublicIPs(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetPublicIPs(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 	 	Resources
 		| where type =~ 'microsoft.network/publicipaddresses'
@@ -85,7 +86,7 @@ func (w *AzureWrapper) GetPublicIPs(ctx context.Context) ([]string, error) {
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetPublicIPDNSNames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetPublicIPDNSNames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 	 	Resources
 		| where type =~ 'microsoft.network/publicipaddresses'
@@ -97,7 +98,7 @@ func (w *AzureWrapper) GetPublicIPDNSNames(ctx context.Context) ([]string, error
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetApplicationGatewayHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetApplicationGatewayHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/applicationgateways'
@@ -109,7 +110,7 @@ func (w *AzureWrapper) GetApplicationGatewayHostnames(ctx context.Context) ([]st
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetApplicationGatewayCertificateDomains(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetApplicationGatewayCertificateDomains(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/applicationgateways'
@@ -124,10 +125,10 @@ func (w *AzureWrapper) GetApplicationGatewayCertificateDomains(ctx context.Conte
 		return nil, err
 	}
 
-	results := []string{}
+	results := []*cloud_provider_t.Asset{}
 	seen := map[string]struct{}{}
 	for _, data := range certData {
-		domains, err := extractCertificateDomains(data)
+		domains, err := extractCertificateDomains(data.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -137,14 +138,14 @@ func (w *AzureWrapper) GetApplicationGatewayCertificateDomains(ctx context.Conte
 				continue
 			}
 			seen[domain] = struct{}{}
-			results = append(results, domain)
+			results = append(results, &cloud_provider_t.Asset{Name: domain})
 		}
 	}
 
 	return results, nil
 }
 
-func (w *AzureWrapper) GetFrontDoorClassicHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetFrontDoorClassicHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/frontdoors'
@@ -156,7 +157,7 @@ func (w *AzureWrapper) GetFrontDoorClassicHostnames(ctx context.Context) ([]stri
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetFrontDoorAfdHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetFrontDoorAfdHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.cdn/profiles/afdendpoints'
@@ -167,7 +168,7 @@ func (w *AzureWrapper) GetFrontDoorAfdHostnames(ctx context.Context) ([]string, 
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetTrafficManagerFQDNs(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetTrafficManagerFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/trafficmanagerprofiles'
@@ -178,7 +179,7 @@ func (w *AzureWrapper) GetTrafficManagerFQDNs(ctx context.Context) ([]string, er
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetDNSZones(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetDNSZones(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/dnszones'
@@ -189,7 +190,7 @@ func (w *AzureWrapper) GetDNSZones(ctx context.Context) ([]string, error) {
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetDNSRecordFQDNs(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetDNSRecordFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.network/dnszones/A' or type =~ 'microsoft.network/dnszones/CNAME'
@@ -200,7 +201,7 @@ func (w *AzureWrapper) GetDNSRecordFQDNs(ctx context.Context) ([]string, error) 
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetStorageWebEndpoints(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetStorageWebEndpoints(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.storage/storageaccounts'
@@ -211,7 +212,7 @@ func (w *AzureWrapper) GetStorageWebEndpoints(ctx context.Context) ([]string, er
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetCDNEndpointHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetCDNEndpointHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.cdn/profiles/endpoints'
@@ -222,7 +223,7 @@ func (w *AzureWrapper) GetCDNEndpointHostnames(ctx context.Context) ([]string, e
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetAppServiceHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetAppServiceHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.web/sites'
@@ -234,7 +235,7 @@ func (w *AzureWrapper) GetAppServiceHostnames(ctx context.Context) ([]string, er
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetSQLServerFQDNs(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetSQLServerFQDNs(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.sql/servers'
@@ -245,7 +246,7 @@ func (w *AzureWrapper) GetSQLServerFQDNs(ctx context.Context) ([]string, error) 
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetCosmosDocumentEndpoints(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetCosmosDocumentEndpoints(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.documentdb/databaseaccounts'
@@ -256,7 +257,7 @@ func (w *AzureWrapper) GetCosmosDocumentEndpoints(ctx context.Context) ([]string
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) GetRedisHostnames(ctx context.Context) ([]string, error) {
+func (w *AzureWrapper) GetRedisHostnames(ctx context.Context) ([]*cloud_provider_t.Asset, error) {
 	query := `
 		Resources
 		| where type =~ 'microsoft.cache/redis'
@@ -267,8 +268,8 @@ func (w *AzureWrapper) GetRedisHostnames(ctx context.Context) ([]string, error) 
 	return w.queryResourceGraph(ctx, query)
 }
 
-func (w *AzureWrapper) queryResourceGraph(ctx context.Context, query string) ([]string, error) {
-	resources := []string{}
+func (w *AzureWrapper) queryResourceGraph(ctx context.Context, query string) ([]*cloud_provider_t.Asset, error) {
+	resources := []*cloud_provider_t.Asset{}
 	req := armresourcegraph.QueryRequest{Query: &query, Options: &armresourcegraph.QueryRequestOptions{}}
 	for {
 		resp, err := w.argClient.Resources(ctx, req, nil)
@@ -341,8 +342,8 @@ func extractCertificateDomains(certData string) ([]string, error) {
 	return results, nil
 }
 
-func decodeResourceGraphData(data any) ([]string, error) {
-	result := []string{}
+func decodeResourceGraphData(data any) ([]*cloud_provider_t.Asset, error) {
+	result := []*cloud_provider_t.Asset{}
 
 	records := []struct {
 		Resource *string `mapstructure:"resource"`
@@ -354,7 +355,7 @@ func decodeResourceGraphData(data any) ([]string, error) {
 
 	for _, r := range records {
 		if r.Resource != nil {
-			result = append(result, *r.Resource)
+			result = append(result, &cloud_provider_t.Asset{Name: *r.Resource})
 		}
 	}
 

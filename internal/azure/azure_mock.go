@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -32,84 +33,84 @@ func (m *MockWrapper) InitResourceGraph(_ context.Context) error {
 	return args.Error(0)
 }
 
-func (m *MockWrapper) GetPublicIPs(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetPublicIPs(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetPublicIPDNSNames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetPublicIPDNSNames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetApplicationGatewayHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetApplicationGatewayHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetApplicationGatewayCertificateDomains(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetApplicationGatewayCertificateDomains(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetFrontDoorClassicHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetFrontDoorClassicHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetFrontDoorAfdHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetFrontDoorAfdHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetTrafficManagerFQDNs(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetTrafficManagerFQDNs(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetDNSZones(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetDNSZones(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetDNSRecordFQDNs(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetDNSRecordFQDNs(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetStorageWebEndpoints(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetStorageWebEndpoints(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetCDNEndpointHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetCDNEndpointHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetAppServiceHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetAppServiceHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetSQLServerFQDNs(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetSQLServerFQDNs(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetCosmosDocumentEndpoints(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetCosmosDocumentEndpoints(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func (m *MockWrapper) GetRedisHostnames(_ context.Context) ([]string, error) {
+func (m *MockWrapper) GetRedisHostnames(_ context.Context) ([]*cloud_provider_t.Asset, error) {
 	args := m.Called()
-	return getStringSlice(args.Get(0)), args.Error(1)
+	return getAssetSlice(args.Get(0)), args.Error(1)
 }
 
-func getStringSlice(value interface{}) []string {
+func getAssetSlice(value interface{}) []*cloud_provider_t.Asset {
 	if value == nil {
 		return nil
 	}
-	return value.([]string)
+	return value.([]*cloud_provider_t.Asset)
 }

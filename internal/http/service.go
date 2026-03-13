@@ -85,6 +85,7 @@ func (s *HttpService) Get(ctx context.Context, url string, options HttpOptions) 
 
 	contentType := strings.ToLower(httpRes.Header().Get("Content-Type"))
 
+	// nosemgrep: go.lang.security.deserialization.unsafe-deserialization-interface.go-unsafe-deserialization-interface
 	var body interface{}
 	if strings.HasPrefix(contentType, "application/json") {
 		if err := json.Unmarshal(httpRes.Body(), &body); err != nil {

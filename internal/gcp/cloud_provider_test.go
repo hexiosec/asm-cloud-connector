@@ -6,6 +6,7 @@ import (
 
 	assetpb "cloud.google.com/go/asset/apiv1/assetpb"
 	certificatemanagerpb "cloud.google.com/go/certificatemanager/apiv1/certificatemanagerpb"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/config"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -103,7 +104,7 @@ func Test_GetResources_Asset_ReturnsResource(t *testing.T) {
 
 	resources, err := provider.GetResources(context.Background())
 	assert.NoError(t, err)
-	assert.Contains(t, resources, "example.com")
+	assert.Equal(t, assetSlice("example.com"), resources)
 }
 
 func Test_GetResources_AssetValidationErr_AssetSkipped(t *testing.T) {
@@ -144,7 +145,7 @@ func Test_GetResources_AssetValidationErr_AssetSkipped(t *testing.T) {
 
 	resources, err := provider.GetResources(context.Background())
 	assert.NoError(t, err)
-	assert.Contains(t, resources, "192.168.0.1")
+	assert.Equal(t, assetSlice("192.168.0.1"), resources)
 }
 
 func newProviderWithWrapper(t *testing.T, cfg *config.GCPCloudProvider) (*GCPProvider, *MockWrapper) {
@@ -155,4 +156,12 @@ func newProviderWithWrapper(t *testing.T, cfg *config.GCPCloudProvider) (*GCPPro
 		wrapper: wrapper,
 	}
 	return provider, wrapper
+}
+
+func assetSlice(names ...string) []*cloud_provider_t.Asset {
+	assets := make([]*cloud_provider_t.Asset, 0, len(names))
+	for _, name := range names {
+		assets = append(assets, &cloud_provider_t.Asset{Name: name})
+	}
+	return assets
 }

@@ -11,23 +11,31 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	acm_t "github.com/aws/aws-sdk-go-v2/service/acm/types"
 	"github.com/aws/aws-sdk-go-v2/service/apigateway"
 	"github.com/aws/aws-sdk-go-v2/service/apigatewayv2"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cloudfront_t "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	ec2_t "github.com/aws/aws-sdk-go-v2/service/ec2/types"
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	elb "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2"
+	elb_t "github.com/aws/aws-sdk-go-v2/service/elasticloadbalancingv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
 	lambda_t "github.com/aws/aws-sdk-go-v2/service/lambda/types"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
+	opensearch_t "github.com/aws/aws-sdk-go-v2/service/opensearch/types"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
 	"github.com/aws/aws-sdk-go-v2/service/rds"
+	rds_t "github.com/aws/aws-sdk-go-v2/service/rds/types"
 	"github.com/aws/aws-sdk-go-v2/service/route53"
+	route53_t "github.com/aws/aws-sdk-go-v2/service/route53/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3_t "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/aws/smithy-go"
+	cloud_provider_t "github.com/hexiosec/asm-cloud-connector/internal/cloud_provider/types"
 	"github.com/hexiosec/asm-cloud-connector/internal/logger"
 )
 
@@ -39,19 +47,19 @@ type IAWSWrapper interface {
 	GetSecretString(ctx context.Context, secret string) (string, error)
 	ListAllAccounts(ctx context.Context) ([]string, error)
 	GetRegions(ctx context.Context) ([]string, error)
-	GetEC2Resources(ctx context.Context, resources []string) ([]string, error)
-	GetEIPResources(ctx context.Context, resources []string) ([]string, error)
-	GetELBResources(ctx context.Context, resources []string) ([]string, error)
-	GetS3Resources(ctx context.Context, resources []string) ([]string, error)
-	GetACMResources(ctx context.Context, resources []string) ([]string, error)
-	GetRoute53Resources(ctx context.Context, resources []string) ([]string, error)
-	GetCloudFrontResources(ctx context.Context, resources []string) ([]string, error)
-	GetAPIGatewayResources(ctx context.Context, resources []string) ([]string, error)
-	GetAPIGatewayV2Resources(ctx context.Context, resources []string) ([]string, error)
-	GetEKSResources(ctx context.Context, resources []string) ([]string, error)
-	GetRDSResources(ctx context.Context, resources []string) ([]string, error)
-	GetOpenSearchResources(ctx context.Context, resources []string) ([]string, error)
-	GetLambdaResources(ctx context.Context, resources []string) ([]string, error)
+	GetEC2Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetEIPResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetELBResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetS3Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetACMResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetRoute53Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetCloudFrontResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetAPIGatewayResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetAPIGatewayV2Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetEKSResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetRDSResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetOpenSearchResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
+	GetLambdaResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error)
 }
 
 type AWSWrapper struct {
@@ -165,7 +173,7 @@ func (w *AWSWrapper) GetRegions(ctx context.Context) ([]string, error) {
 	return regions, nil
 }
 
-func (w *AWSWrapper) GetEC2Resources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetEC2Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := ec2.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting EC2 VM resources")
 
@@ -187,11 +195,12 @@ func (w *AWSWrapper) GetEC2Resources(ctx context.Context, resources []string) ([
 		for _, reservation := range resp.Reservations {
 			for _, instance := range reservation.Instances {
 				logger.GetLogger(ctx).Trace().Msgf("found instance %s", *instance.InstanceId)
+				tags := formatEC2Tags(instance.Tags, populateTags)
 				if instance.PublicDnsName != nil {
-					resources = append(resources, *instance.PublicDnsName)
+					resources = appendAsset(resources, *instance.PublicDnsName, tags)
 				}
 				if instance.PublicIpAddress != nil {
-					resources = append(resources, *instance.PublicIpAddress)
+					resources = appendAsset(resources, *instance.PublicIpAddress, tags)
 				}
 			}
 		}
@@ -200,30 +209,26 @@ func (w *AWSWrapper) GetEC2Resources(ctx context.Context, resources []string) ([
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetEIPResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetEIPResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := ec2.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting Elastic IPs (EIP) resources")
 
-	pager := ec2.NewDescribeAddressesAttributePaginator(client, &ec2.DescribeAddressesAttributeInput{})
+	resp, err := client.DescribeAddresses(ctx, &ec2.DescribeAddressesInput{})
+	if err != nil {
+		return resources, fmt.Errorf("aws: getting EIP resources, %w", err)
+	}
 
-	for pager.HasMorePages() {
-		resp, err := pager.NextPage(ctx)
-		if err != nil {
-			return resources, fmt.Errorf("aws: getting EIP resources, %w", err)
-		}
-
-		for _, address := range resp.Addresses {
-			logger.GetLogger(ctx).Trace().Msgf("found address %s", *address.AllocationId)
-			if address.PublicIp != nil {
-				resources = append(resources, *address.PublicIp)
-			}
+	for _, address := range resp.Addresses {
+		logger.GetLogger(ctx).Trace().Msgf("found address %s", *address.AllocationId)
+		if address.PublicIp != nil {
+			resources = appendAsset(resources, *address.PublicIp, formatEC2Tags(address.Tags, populateTags))
 		}
 	}
 
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetELBResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetELBResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := elb.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting elastic load balancer (ELB) resources")
 
@@ -241,8 +246,12 @@ func (w *AWSWrapper) GetELBResources(ctx context.Context, resources []string) ([
 
 		for _, loadBalancer := range resp.LoadBalancers {
 			logger.GetLogger(ctx).Trace().Msgf("found load balancer %s", *loadBalancer.LoadBalancerArn)
+			tags, tagErr := w.getELBTags(ctx, client, loadBalancer.LoadBalancerArn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get ELB tags for %s", aws.ToString(loadBalancer.LoadBalancerArn))
+			}
 			if loadBalancer.DNSName != nil {
-				resources = append(resources, *loadBalancer.DNSName)
+				resources = appendAsset(resources, *loadBalancer.DNSName, tags)
 			}
 		}
 
@@ -255,7 +264,7 @@ func (w *AWSWrapper) GetELBResources(ctx context.Context, resources []string) ([
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetS3Resources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetS3Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := s3.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting S3 bucket resources")
 
@@ -274,6 +283,10 @@ func (w *AWSWrapper) GetS3Resources(ctx context.Context, resources []string) ([]
 
 		for _, bucket := range resp.Buckets {
 			logger.GetLogger(ctx).Trace().Msgf("found bucket %s", *bucket.Name)
+			tags, tagErr := w.getS3Tags(ctx, client, bucket.Name, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get S3 tags for bucket %s", aws.ToString(bucket.Name))
+			}
 
 			isPublic, err := w.isS3Public(ctx, client, bucket.Name)
 			if err != nil {
@@ -297,7 +310,7 @@ func (w *AWSWrapper) GetS3Resources(ctx context.Context, resources []string) ([]
 				loc = `%s.s3-website-%s.amazonaws.com`
 			}
 
-			resources = append(resources, fmt.Sprintf(loc, *bucket.Name, w.cfg.Region))
+			resources = appendAsset(resources, fmt.Sprintf(loc, *bucket.Name, w.cfg.Region), tags)
 		}
 
 		if resp.ContinuationToken == nil {
@@ -413,7 +426,7 @@ func (w *AWSWrapper) isS3Website(ctx context.Context, client *s3.Client, bucket 
 	return true, nil
 }
 
-func (w *AWSWrapper) GetACMResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetACMResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := acm.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting ACM TLS Certificate resources")
 
@@ -431,12 +444,18 @@ func (w *AWSWrapper) GetACMResources(ctx context.Context, resources []string) ([
 
 		for _, certificate := range resp.CertificateSummaryList {
 			logger.GetLogger(ctx).Trace().Msgf("found certificate %s", *certificate.CertificateArn)
+			tags, tagErr := w.getACMTags(ctx, client, certificate.CertificateArn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get ACM tags for %s", aws.ToString(certificate.CertificateArn))
+			}
 			if certificate.DomainName != nil {
-				resources = append(resources, *certificate.DomainName)
+				resources = appendAsset(resources, *certificate.DomainName, tags)
 			}
 
 			if certificate.HasAdditionalSubjectAlternativeNames == nil || !*certificate.HasAdditionalSubjectAlternativeNames {
-				resources = append(resources, certificate.SubjectAlternativeNameSummaries...)
+				for _, name := range certificate.SubjectAlternativeNameSummaries {
+					resources = appendAsset(resources, name, tags)
+				}
 			} else {
 				detail, err := client.DescribeCertificate(ctx, &acm.DescribeCertificateInput{
 					CertificateArn: certificate.CertificateArn,
@@ -444,7 +463,9 @@ func (w *AWSWrapper) GetACMResources(ctx context.Context, resources []string) ([
 				if err != nil {
 					logger.GetLogger(ctx).Warn().Err(err).Msgf("Failed to get %s certificate detail, unable to add subject alternative names", *certificate.CertificateArn)
 				} else {
-					resources = append(resources, detail.Certificate.SubjectAlternativeNames...)
+					for _, name := range detail.Certificate.SubjectAlternativeNames {
+						resources = appendAsset(resources, name, tags)
+					}
 				}
 			}
 
@@ -459,7 +480,7 @@ func (w *AWSWrapper) GetACMResources(ctx context.Context, resources []string) ([
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetRoute53Resources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetRoute53Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := route53.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting Route53 DNS resources")
 
@@ -477,10 +498,14 @@ func (w *AWSWrapper) GetRoute53Resources(ctx context.Context, resources []string
 
 		for _, zone := range resp.HostedZones {
 			logger.GetLogger(ctx).Trace().Msgf("found hosted zone %s", *zone.Id)
+			tags, tagErr := w.getRoute53HostedZoneTags(ctx, client, zone.Id, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get Route53 tags for hosted zone %s", aws.ToString(zone.Id))
+			}
 
-			resources = append(resources, *zone.Name)
+			resources = appendAsset(resources, *zone.Name, tags)
 
-			resources, err = w.getHostedZoneResources(ctx, client, zone.Id, resources)
+			resources, err = w.getHostedZoneResources(ctx, client, zone.Id, resources, tags)
 			if err != nil {
 				return resources, fmt.Errorf("aws: getting hosted zone %s, %w", *zone.Id, err)
 			}
@@ -495,7 +520,7 @@ func (w *AWSWrapper) GetRoute53Resources(ctx context.Context, resources []string
 	return resources, nil
 }
 
-func (w *AWSWrapper) getHostedZoneResources(ctx context.Context, client *route53.Client, zoneId *string, resources []string) ([]string, error) {
+func (w *AWSWrapper) getHostedZoneResources(ctx context.Context, client *route53.Client, zoneId *string, resources []*cloud_provider_t.Asset, tags []string) ([]*cloud_provider_t.Asset, error) {
 	var nextToken *string
 	for {
 		resp, err := client.ListResourceRecordSets(
@@ -512,7 +537,7 @@ func (w *AWSWrapper) getHostedZoneResources(ctx context.Context, client *route53
 		// Only collect record names
 		// We don’t need the record values (A, AAAA, etc.) here because ASM will resolve them itself.
 		for _, record := range resp.ResourceRecordSets {
-			resources = append(resources, *record.Name)
+			resources = appendAsset(resources, *record.Name, tags)
 		}
 
 		if resp.NextRecordIdentifier == nil {
@@ -524,7 +549,7 @@ func (w *AWSWrapper) getHostedZoneResources(ctx context.Context, client *route53
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetCloudFrontResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetCloudFrontResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := cloudfront.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting CloudFront CDN resources")
 
@@ -542,10 +567,14 @@ func (w *AWSWrapper) GetCloudFrontResources(ctx context.Context, resources []str
 
 		for _, distribution := range resp.DistributionList.Items {
 			logger.GetLogger(ctx).Trace().Msgf("found distribution %s", *distribution.Id)
-			resources = append(resources, *distribution.DomainName)
+			tags, tagErr := w.getCloudFrontTags(ctx, client, distribution.ARN, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get CloudFront tags for %s", aws.ToString(distribution.ARN))
+			}
+			resources = appendAsset(resources, *distribution.DomainName, tags)
 
 			for _, origin := range distribution.Origins.Items {
-				resources = append(resources, *origin.DomainName)
+				resources = appendAsset(resources, *origin.DomainName, tags)
 			}
 		}
 
@@ -558,7 +587,7 @@ func (w *AWSWrapper) GetCloudFrontResources(ctx context.Context, resources []str
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetAPIGatewayResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetAPIGatewayResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := apigateway.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting API Gateway resources")
 
@@ -573,7 +602,7 @@ func (w *AWSWrapper) GetAPIGatewayResources(ctx context.Context, resources []str
 
 		for _, api := range resp.Items {
 			logger.GetLogger(ctx).Trace().Msgf("found api %s", *api.Id)
-			resources = append(resources, fmt.Sprintf("%s.execute-api.%s.amazonaws.com", *api.Id, w.cfg.Region))
+			resources = appendAsset(resources, fmt.Sprintf("%s.execute-api.%s.amazonaws.com", *api.Id, w.cfg.Region), formatStringMapTags(api.Tags, populateTags))
 		}
 	}
 
@@ -588,14 +617,14 @@ func (w *AWSWrapper) GetAPIGatewayResources(ctx context.Context, resources []str
 
 		for _, domain := range resp.Items {
 			logger.GetLogger(ctx).Trace().Msgf("found domain %s", *domain.DomainNameId)
-			resources = append(resources, *domain.DomainName)
+			resources = appendAsset(resources, *domain.DomainName, formatStringMapTags(domain.Tags, populateTags))
 		}
 	}
 
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetAPIGatewayV2Resources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetAPIGatewayV2Resources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := apigatewayv2.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting API Gateway v2 resources")
 
@@ -614,7 +643,7 @@ func (w *AWSWrapper) GetAPIGatewayV2Resources(ctx context.Context, resources []s
 		for _, api := range resp.Items {
 			logger.GetLogger(ctx).Trace().Msgf("found api %s", *api.ApiId)
 			if api.ApiEndpoint != nil {
-				resources = append(resources, *api.ApiEndpoint)
+				resources = appendAsset(resources, *api.ApiEndpoint, formatStringMapTags(api.Tags, populateTags))
 			}
 		}
 
@@ -627,7 +656,7 @@ func (w *AWSWrapper) GetAPIGatewayV2Resources(ctx context.Context, resources []s
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetEKSResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetEKSResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := eks.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting EKS resources")
 
@@ -657,7 +686,7 @@ func (w *AWSWrapper) GetEKSResources(ctx context.Context, resources []string) ([
 			}
 
 			if detail.Cluster != nil && detail.Cluster.Endpoint != nil {
-				resources = append(resources, *detail.Cluster.Endpoint)
+				resources = appendAsset(resources, *detail.Cluster.Endpoint, formatStringMapTags(detail.Cluster.Tags, populateTags))
 			}
 		}
 
@@ -670,7 +699,7 @@ func (w *AWSWrapper) GetEKSResources(ctx context.Context, resources []string) ([
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetRDSResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetRDSResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := rds.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting RDS Database resources")
 
@@ -683,9 +712,13 @@ func (w *AWSWrapper) GetRDSResources(ctx context.Context, resources []string) ([
 
 		for _, db := range resp.DBInstances {
 			logger.GetLogger(ctx).Trace().Msgf("found db %s", *db.DBInstanceIdentifier)
+			tags, tagErr := w.getRDSTags(ctx, client, db.DBInstanceArn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get RDS instance tags for %s", aws.ToString(db.DBInstanceArn))
+			}
 
 			if db.Endpoint != nil && db.Endpoint.Address != nil {
-				resources = append(resources, *db.Endpoint.Address)
+				resources = appendAsset(resources, *db.Endpoint.Address, tags)
 			}
 		}
 	}
@@ -699,13 +732,17 @@ func (w *AWSWrapper) GetRDSResources(ctx context.Context, resources []string) ([
 
 		for _, db := range resp.DBClusters {
 			logger.GetLogger(ctx).Trace().Msgf("found db %s", *db.DBClusterIdentifier)
+			tags, tagErr := w.getRDSTags(ctx, client, db.DBClusterArn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get RDS cluster tags for %s", aws.ToString(db.DBClusterArn))
+			}
 
 			if db.Endpoint != nil {
-				resources = append(resources, *db.Endpoint)
+				resources = appendAsset(resources, *db.Endpoint, tags)
 			}
 
 			if db.ReaderEndpoint != nil {
-				resources = append(resources, *db.ReaderEndpoint)
+				resources = appendAsset(resources, *db.ReaderEndpoint, tags)
 			}
 		}
 	}
@@ -713,7 +750,7 @@ func (w *AWSWrapper) GetRDSResources(ctx context.Context, resources []string) ([
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetOpenSearchResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetOpenSearchResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := opensearch.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting OpenSearch (ElasticSearch) resources")
 
@@ -726,9 +763,13 @@ func (w *AWSWrapper) GetOpenSearchResources(ctx context.Context, resources []str
 
 		for _, app := range resp.ApplicationSummaries {
 			logger.GetLogger(ctx).Trace().Msgf("found app %s", *app.Id)
+			tags, tagErr := w.getOpenSearchTags(ctx, client, app.Arn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get OpenSearch tags for %s", aws.ToString(app.Arn))
+			}
 
 			if app.Endpoint != nil {
-				resources = append(resources, *app.Endpoint)
+				resources = appendAsset(resources, *app.Endpoint, tags)
 			}
 		}
 	}
@@ -736,7 +777,7 @@ func (w *AWSWrapper) GetOpenSearchResources(ctx context.Context, resources []str
 	return resources, nil
 }
 
-func (w *AWSWrapper) GetLambdaResources(ctx context.Context, resources []string) ([]string, error) {
+func (w *AWSWrapper) GetLambdaResources(ctx context.Context, resources []*cloud_provider_t.Asset, populateTags bool) ([]*cloud_provider_t.Asset, error) {
 	client := lambda.NewFromConfig(*w.cfg)
 	logger.GetLogger(ctx).Trace().Msgf("getting Lambda Function resources")
 
@@ -749,6 +790,10 @@ func (w *AWSWrapper) GetLambdaResources(ctx context.Context, resources []string)
 
 		for _, function := range resp.Functions {
 			logger.GetLogger(ctx).Trace().Msgf("found function %s", *function.FunctionName)
+			tags, tagErr := w.getLambdaTags(ctx, client, function.FunctionArn, populateTags)
+			if tagErr != nil {
+				logger.GetLogger(ctx).Warn().Err(tagErr).Msgf("failed to get Lambda tags for %s", aws.ToString(function.FunctionArn))
+			}
 
 			urlConfig, err := client.GetFunctionUrlConfig(
 				ctx,
@@ -766,9 +811,329 @@ func (w *AWSWrapper) GetLambdaResources(ctx context.Context, resources []string)
 				continue
 			}
 
-			resources = append(resources, *urlConfig.FunctionUrl)
+			resources = appendAsset(resources, *urlConfig.FunctionUrl, tags)
 		}
 	}
 
 	return resources, nil
+}
+
+func appendAsset(resources []*cloud_provider_t.Asset, name string, tags []string) []*cloud_provider_t.Asset {
+	if name == "" {
+		return resources
+	}
+
+	var assetTags []string
+	if len(tags) > 0 {
+		assetTags = append([]string(nil), tags...)
+	}
+
+	return append(resources, &cloud_provider_t.Asset{Name: name, Tags: assetTags})
+}
+
+func formatEC2Tags(tags []ec2_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatACMTags(tags []acm_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatELBTags(tags []elb_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatS3Tags(tags []s3_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatRoute53Tags(tags []route53_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatCloudFrontTags(tags []cloudfront_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatOpenSearchTags(tags []opensearch_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatRDSTags(tags []rds_t.Tag, populateTags bool) []string {
+	if !populateTags {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for _, tag := range tags {
+		if tag.Key == nil || *tag.Key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, *tag.Key, aws.ToString(tag.Value))
+	}
+
+	return emptyToNil(formatted)
+}
+
+func formatStringMapTags(tags map[string]string, populateTags bool) []string {
+	if !populateTags || len(tags) == 0 {
+		return nil
+	}
+
+	formatted := make([]string, 0, len(tags))
+	seen := make(map[string]struct{}, len(tags))
+	for key, value := range tags {
+		if key == "" {
+			continue
+		}
+		formatted = appendTag(formatted, seen, key, value)
+	}
+
+	return emptyToNil(formatted)
+}
+
+func appendTag(tags []string, seen map[string]struct{}, key string, value string) []string {
+	formatted := fmt.Sprintf("%s: %s", key, value)
+	if _, ok := seen[formatted]; ok {
+		return tags
+	}
+
+	seen[formatted] = struct{}{}
+	return append(tags, formatted)
+}
+
+func emptyToNil(tags []string) []string {
+	if len(tags) == 0 {
+		return nil
+	}
+	return tags
+}
+
+func (w *AWSWrapper) getELBTags(ctx context.Context, client *elb.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.DescribeTags(ctx, &elb.DescribeTagsInput{
+		ResourceArns: []string{*arn},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, description := range resp.TagDescriptions {
+		if description.ResourceArn != nil && *description.ResourceArn == *arn {
+			return formatELBTags(description.Tags, true), nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (w *AWSWrapper) getS3Tags(ctx context.Context, client *s3.Client, bucket *string, populateTags bool) ([]string, error) {
+	if !populateTags || bucket == nil || *bucket == "" {
+		return nil, nil
+	}
+
+	resp, err := client.GetBucketTagging(ctx, &s3.GetBucketTaggingInput{Bucket: bucket})
+	if err != nil {
+		if errType := (&smithy.GenericAPIError{}); errors.As(err, &errType) && errType.Code == "NoSuchTagSet" {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return formatS3Tags(resp.TagSet, true), nil
+}
+
+func (w *AWSWrapper) getACMTags(ctx context.Context, client *acm.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.ListTagsForCertificate(ctx, &acm.ListTagsForCertificateInput{
+		CertificateArn: arn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return formatACMTags(resp.Tags, true), nil
+}
+
+func (w *AWSWrapper) getRoute53HostedZoneTags(ctx context.Context, client *route53.Client, zoneID *string, populateTags bool) ([]string, error) {
+	if !populateTags || zoneID == nil || *zoneID == "" {
+		return nil, nil
+	}
+
+	resourceID := strings.TrimPrefix(*zoneID, "/hostedzone/")
+	resp, err := client.ListTagsForResource(ctx, &route53.ListTagsForResourceInput{
+		ResourceId:   &resourceID,
+		ResourceType: route53_t.TagResourceTypeHostedzone,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.ResourceTagSet == nil {
+		return nil, nil
+	}
+
+	return formatRoute53Tags(resp.ResourceTagSet.Tags, true), nil
+}
+
+func (w *AWSWrapper) getCloudFrontTags(ctx context.Context, client *cloudfront.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.ListTagsForResource(ctx, &cloudfront.ListTagsForResourceInput{
+		Resource: arn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.Tags == nil {
+		return nil, nil
+	}
+
+	return formatCloudFrontTags(resp.Tags.Items, true), nil
+}
+
+func (w *AWSWrapper) getRDSTags(ctx context.Context, client *rds.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.ListTagsForResource(ctx, &rds.ListTagsForResourceInput{
+		ResourceName: arn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return formatRDSTags(resp.TagList, true), nil
+}
+
+func (w *AWSWrapper) getOpenSearchTags(ctx context.Context, client *opensearch.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.ListTags(ctx, &opensearch.ListTagsInput{
+		ARN: arn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return formatOpenSearchTags(resp.TagList, true), nil
+}
+
+func (w *AWSWrapper) getLambdaTags(ctx context.Context, client *lambda.Client, arn *string, populateTags bool) ([]string, error) {
+	if !populateTags || arn == nil || *arn == "" {
+		return nil, nil
+	}
+
+	resp, err := client.ListTags(ctx, &lambda.ListTagsInput{
+		Resource: arn,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return formatStringMapTags(resp.Tags, true), nil
 }
