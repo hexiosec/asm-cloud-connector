@@ -96,6 +96,7 @@ type Config struct {
 	ScanID           string              `yaml:"scan_id" env:"SCAN_ID,overwrite" validate:"required"`
 	SeedTag          string              `yaml:"seed_tag" env:"SEED_TAG,overwrite" validate:"required"`
 	DeleteStaleSeeds bool                `yaml:"delete_stale_seeds" env:"DELETE_STALE_SEEDS,overwrite"`
+	IgnoreList       []string            `yaml:"ignore_list" env:"IGNORE_LIST,overwrite"`
 	AWS              *AWSCloudProvider   `yaml:"aws,omitempty" env:",noinit" validate:"required_without_all=Azure GCP"`
 	Azure            *AzureCloudProvider `yaml:"azure,omitempty" env:",noinit" validate:"required_without_all=AWS GCP"`
 	GCP              *GCPCloudProvider   `yaml:"gcp,omitempty" env:",noinit" validate:"required_without_all=AWS Azure"`

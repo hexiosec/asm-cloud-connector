@@ -30,14 +30,26 @@ type Connector struct {
 	scanID      string
 	seedTag     string
 	deleteStale bool
+	ignoreList  map[string]struct{}
 	sdk         api.API
 }
 
 func NewConnector(cfg *config.Config, sdk api.API) (*Connector, error) {
+	ignoreList := make(map[string]struct{}, len(cfg.IgnoreList))
+	for i, entry := range cfg.IgnoreList {
+		name, ok := normaliseResource(entry)
+		_, _, cidrErr := net.ParseCIDR(strings.TrimSpace(entry))
+		if !ok || strings.Contains(entry, "*") || cidrErr == nil {
+			return nil, fmt.Errorf("ignore_list[%d]: expected a domain, IP address or URL without wildcards or CIDR ranges", i)
+		}
+		ignoreList[name] = struct{}{}
+	}
+
 	return &Connector{
 		scanID:      cfg.ScanID,
 		seedTag:     cfg.SeedTag,
 		deleteStale: cfg.DeleteStaleSeeds,
+		ignoreList:  ignoreList,
 		sdk:         sdk,
 	}, nil
 }
@@ -84,6 +96,11 @@ func (c *Connector) SyncResources(ctx context.Context, assets []*cloud_provider_
 	for _, asset := range assets {
 		iCtx := logger.WithLogger(ctx, logger.GetLogger(ctx).With().Str("resource", asset.Name).Logger())
 		logger.GetLogger(iCtx).Trace().Msg("Processing resource")
+
+		if _, ignored := c.ignoreList[asset.Name]; ignored {
+			logger.GetLogger(iCtx).Debug().Msg("Skipping resource in ignore list")
+			continue
+		}
 
 		if _, ok := existingSeeds[asset.Name]; ok {
 			delete(existingSeeds, asset.Name)

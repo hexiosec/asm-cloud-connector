@@ -89,6 +89,7 @@ EOF
 | `ScanID`              | `scan_id`/`SCAN_ID`                                            | ASM scan that receives discovered resources (as seeds).                                                                | **Required**. Must be a valid scan UUID.                          |
 | `SeedTag`             | `seed_tag`/`SEED_TAG`                                          | Label applied to all seeds created by the Cloud Connector.                                                             | Defaults to `cloud-connector` when not provided.                  |
 | `DeleteStaleSeeds`    | `delete_stale_seeds`/`DELETE_STALE_SEEDS`                      | Controls whether seeds missing from the latest run, with the seed tag label, are deleted in ASM.                       | Defaults to `false` unless set in config or env.                  |
+| `IgnoreList`          | `ignore_list`/`IGNORE_LIST`                                   | Excludes specific discovered seeds from synchronisation across all providers.                                         | Defaults to an empty list. `IGNORE_LIST` is comma-separated and overrides YAML. |
 | `AWS`, `Azure`, `GCP` | `aws`, `azure`, `gcp` blocks (each with `enabled: true/false`) | Toggles discovery for each provider. At least one must be enabled.                                                     | Validation requires one provider block to be enabled.             |
 | `Http.RetryCount`     | `http.retry_count`                                             | Number of retries for outbound HTTP requests to the endpoints listed in [Network Connectivity](#network-connectivity). | Defaults to `4` when omitted.                                     |
 | `Http.RetryBaseDelay` | `http.retry_base_delay`                                        | Base delay between retries.                                                                                            | Defaults to `1s`. Accepts duration strings (`500ms`, `2s`, etc.). |
@@ -103,6 +104,24 @@ delete_stale_seeds: true
 aws:
   enabled: true
 ```
+
+#### Ignoring discovered seeds
+
+Use `ignore_list` to exclude specific domains or IP addresses, for example a DNS record pointing to a third-party service:
+
+```yaml
+ignore_list:
+  - third-party.example.com
+  - 203.0.113.10
+```
+
+Alternatively, set `IGNORE_LIST=third-party.example.com,203.0.113.10`. The list also works inside YAML supplied through `CONNECTOR_CONFIG`.
+
+Matching is exact after the same normalisation used for discovered resources: surrounding whitespace, domain case and trailing dots are ignored, and URLs are reduced to their hostname. Subdomains must be listed separately. Wildcards, CIDR ranges and regular expressions are not supported. Empty or invalid entries cause connector initialisation to fail.
+
+Ignored resources remain visible in discovery debug logs but are skipped when adding seeds. If an ignored seed already exists with the configured `seed_tag`, it is removed when `delete_stale_seeds: true`. With `delete_stale_seeds: false`, existing seeds remain until removed manually. Seeds without the connector's tag are preserved.
+
+This setting controls which seeds the connector synchronises. It does not exclude assets discovered through other seeds during an ASM scan.
 
 #### AWS Configuration
 
@@ -198,7 +217,7 @@ You can also build and run the Cloud Connector directly from source to validate 
 
 #### Prerequisites
 
-- Go toolchain installed (tested with Go 1.22+)
+- Go toolchain installed (Go 1.26+ required)
 - `API_KEY` environment variable set to a valid Hexiosec ASM API key
 - Optional: `LOG_LEVEL` (defaults to `info`) and `--debug` flag for human-readable logs
 
@@ -243,7 +262,7 @@ The `cmd/manual_sync` command pushes a one-off set of resources to the Hexiosec 
 
 #### Prerequisites
 
-- Go toolchain installed (tested with Go 1.22+)
+- Go toolchain installed (Go 1.26+ required)
 - `API_KEY` environment variable set to a valid Hexiosec ASM API key
 - Optional: `LOG_LEVEL` (defaults to `info`) and `--debug` flag for human-readable logs
 
@@ -304,7 +323,7 @@ The `cmd/check_version` command checks the current Hexiosec Cloud Connector vers
 
 #### Prerequisites
 
-- Go toolchain installed (tested with Go 1.22+)
+- Go toolchain installed (Go 1.26+ required)
 - Optional: `.env` file with `LOG_LEVEL` and other environment configuration
 - Optional: `--debug` flag for human-readable console output
 

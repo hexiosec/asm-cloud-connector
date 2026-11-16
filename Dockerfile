@@ -1,5 +1,5 @@
 # Build stage: compile statically for portability (CGO disabled).
-FROM golang:1.25.5-alpine3.21 AS builder
+FROM golang:1.26-alpine AS builder
 ENV CGO_ENABLED=0
 ARG VERSION=dev
 
@@ -15,7 +15,7 @@ RUN go build -trimpath \
     -o /bin/asm-cloud-connector ./cmd/connector
 
 # Runtime stage: minimal image with CA certs and non-root user.
-FROM alpine:3.23
+FROM alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 RUN apk add --no-cache ca-certificates \
     && addgroup -S asm \

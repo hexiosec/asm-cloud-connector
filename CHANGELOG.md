@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0]
+
+- Added `ignore_list` configuration (or comma-separated `IGNORE_LIST`) to exclude specific discovered seeds across all cloud providers. Matching uses normalised domains and IP addresses; existing connector-tagged seeds are removed only when `delete_stale_seeds` is enabled.
+- Building from source now requires Go 1.26 or newer. Container and Lambda deployments require no migration.
+- Dependency updates
+
 ## [2.0.0]
 
 - Added AWS tag collection for discovered assets and propagation of those tags to ASM seed creation, with support across the current AWS resource discovery set.

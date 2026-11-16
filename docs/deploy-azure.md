@@ -46,6 +46,7 @@ The Cloud Connector reads its configuration from the environment variable `CONNE
 scan_id: d580a913-318e-40e5-8442-7680909da530
 seed_tag: cloud_connector
 delete_stale_seeds: true
+ignore_list: []
 
 azure:
   enabled: true
@@ -73,8 +74,11 @@ azure:
 | `SCAN_ID`            | `scan_id`            |
 | `SEED_TAG`           | `seed_tag`           |
 | `DELETE_STALE_SEEDS` | `delete_stale_seeds` |
+| `IGNORE_LIST`        | `ignore_list` (comma-separated) |
 
 Environment variables override YAML values.
+
+Use `ignore_list` to exclude exact domains or IP addresses from seed synchronisation. See [Ignoring discovered seeds](../README.md#ignoring-discovered-seeds) for examples, matching rules and handling of existing seeds.
 
 ### 3.3 Key Configuration Options
 

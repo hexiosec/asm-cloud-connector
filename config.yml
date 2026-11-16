@@ -1,6 +1,7 @@
 scan_id: 00000000-0000-0000-0000-000000000000
 seed_tag: cloud_connector
 delete_stale_seeds: true
+ignore_list: [] # Exact domains or IP addresses to exclude from seed synchronisation
 aws:
   enabled: true
   api_key_secret: asm-cloud-connector/api-key

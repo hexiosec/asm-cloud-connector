@@ -1,31 +1,73 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:base"],
+  "extends": ["config:recommended", ":separateMultipleMajorReleases", "docker:pinDigests"],
   "assigneesFromCodeOwners": true,
-  "labels": ["renovate"],
+  "labels": ["renovate", "dependencies", "creepycrawly"],
   "automergeType": "pr",
   "platformAutomerge": true,
+  "rangeStrategy": "bump",
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
   "lockFileMaintenance": {
     "enabled": true,
     "automerge": true
   },
   "postUpdateOptions": ["gomodTidy"],
+  "vulnerabilityAlerts": {
+    "labels": ["renovate", "dependencies", "creepycrawly", "deps:security"]
+  },
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
-      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
-      "automerge": true
-    },
-    {
-      "matchDepTypes": ["devDependencies"],
-      "automerge": true
+      "matchPackageNames": ["*"],
+      "minimumReleaseAge": "14 days"
     },
     {
       "matchPackageNames": ["go", "golang"],
       "groupName": "go",
-      "automerge": true
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchUpdateTypes": ["patch"],
+      "addLabels": ["deps:patch"],
+      "automerge": true,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchUpdateTypes": ["minor"],
+      "addLabels": ["deps:minor"],
+      "automerge": true,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchUpdateTypes": ["digest", "pinDigest"],
+      "addLabels": ["deps:digest"],
+      "automerge": true,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "addLabels": ["deps:lockfile"],
+      "automerge": true,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["deps:major"],
+      "automerge": false,
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchCurrentVersion": "/^0\\./",
+      "automerge": false,
+      "addLabels": ["deps:pre1", "needs-review"],
+      "minimumReleaseAge": "14 days"
+    },
+    {
+      "matchDepTypes": ["devDependencies"],
+      "addLabels": ["deps:dev"],
+      "automerge": true,
+      "minimumReleaseAge": "14 days"
     }
-  ],
-  "digest": {
-    "automerge": true
-  }
+  ]
 }
